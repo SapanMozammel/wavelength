@@ -35,7 +35,8 @@ equal lightness, which `hsl` does not guarantee.
 |---|---|
 | `success` | Delivered, connected |
 | `warning` | Reconnecting, degraded |
-| `danger` | Send failure, destructive actions |
+| `danger` | Send failure, destructive actions — fills, borders, icons |
+| `danger-ink` / `danger-ink-dark` | Error **text**. `danger` is 3.87:1 on `surface`, which clears the 3:1 bar for a border but fails AA for copy. |
 
 ## Dark mode
 
