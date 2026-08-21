@@ -31,3 +31,68 @@
 		border-radius: 999px;
 	}
 }
+
+// Landing-page entrance, in five fixed delay steps. Static class names — the
+// delay is baked in rather than computed, so nothing builds a class at runtime.
+.animate-rise {
+	animation: wl-rise 620ms var(--ease-out-expo) both;
+}
+
+.animate-rise-2 {
+	animation: wl-rise 620ms var(--ease-out-expo) 90ms both;
+}
+
+.animate-rise-3 {
+	animation: wl-rise 620ms var(--ease-out-expo) 180ms both;
+}
+
+.animate-rise-4 {
+	animation: wl-rise 620ms var(--ease-out-expo) 270ms both;
+}
+
+.animate-rise-5 {
+	animation: wl-rise 620ms var(--ease-out-expo) 360ms both;
+}
+
+// `global.scss` collapses animation *duration* under reduced motion but leaves
+// the delay, which would hold a staggered element invisible for a beat. Zero it
+// here so the whole page is simply present.
+@media (prefers-reduced-motion: reduce) {
+	.animate-rise,
+	.animate-rise-2,
+	.animate-rise-3,
+	.animate-rise-4,
+	.animate-rise-5 {
+		animation-delay: 0ms !important;
+	}
+}
+
+// Atmosphere behind the hero: a violet bloom overhead and a cyan trace off to
+// one side. Written as real CSS because the tokens are `oklch()` custom
+// properties, and `color-mix()` is the only way to give one an alpha channel.
+.signal-aura {
+	background:
+		radial-gradient(64rem 42rem at 50% -12%, color-mix(in oklab, var(--color-signal-600) 16%, transparent), transparent 70%),
+		radial-gradient(38rem 26rem at 88% 12%, color-mix(in oklab, var(--color-pulse-500) 10%, transparent), transparent 70%);
+}
+
+.dark .signal-aura {
+	background:
+		radial-gradient(64rem 42rem at 50% -12%, color-mix(in oklab, var(--color-signal-500) 24%, transparent), transparent 70%),
+		radial-gradient(38rem 26rem at 88% 12%, color-mix(in oklab, var(--color-pulse-500) 12%, transparent), transparent 70%);
+}
+
+// A faint measured grid, like the reticle on a spectrum analyser. Used once,
+// behind the section that explains the identity model.
+.signal-grid {
+	background-image:
+		linear-gradient(to right, color-mix(in oklab, var(--color-border-subtle) 70%, transparent) 1px, transparent 1px),
+		linear-gradient(to bottom, color-mix(in oklab, var(--color-border-subtle) 70%, transparent) 1px, transparent 1px);
+	background-size: 5rem 5rem;
+}
+
+.dark .signal-grid {
+	background-image:
+		linear-gradient(to right, color-mix(in oklab, var(--color-border-subtle-dark) 70%, transparent) 1px, transparent 1px),
+		linear-gradient(to bottom, color-mix(in oklab, var(--color-border-subtle-dark) 70%, transparent) 1px, transparent 1px);
+}

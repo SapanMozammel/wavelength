@@ -11,7 +11,7 @@ equal lightness, which `hsl` does not guarantee.
 | Token | Role |
 |---|---|
 | `signal-50` … `signal-900` | Primary violet ramp. `signal-600` is the default interactive colour; `signal-300` is its dark-mode counterpart. |
-| `pulse-400` / `pulse-500` / `pulse-600` | Cyan accent. **Reserved for things that are live** — connection status, new-message affordances, the hero's signal rings. Do not use it as a second brand colour. |
+| `pulse-400` / `pulse-500` / `pulse-600` / `pulse-700` | Cyan accent. **Reserved for things that are live** — connection status, new-message affordances, the hero's signal rings. Do not use it as a second brand colour. `pulse-600` fails AA for text on a light surface (2.9:1); use `pulse-700` for cyan *text* or a cyan indicator dot in the light theme, and `pulse-400` in the dark one. |
 
 ## Semantic surfaces
 
