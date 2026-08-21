@@ -55,17 +55,27 @@ const mockAuthApi = async (page: Page) => {
  * Seeds `localStorage` for the app's origin. Done by visiting the origin first
  * rather than with `addInitScript`, so the write happens once and the app is
  * free to clear the key without this putting it straight back.
+ *
+ * The landing page is used deliberately — never `/login` or `/chat`. Chromium
+ * can deliver the `framenavigated` event for this navigation *after* `goto`
+ * resolves, so seeding on `/login` leaves a stray `/login` in any tracker the
+ * test arms next, and a correct app then reads as one that redirected.
  */
 const seedSession = async (page: Page, token: string) => {
-	await page.goto('/login');
+	await page.goto('/');
 	await page.evaluate(([key, value]) => window.localStorage.setItem(key, value), [STORAGE_KEY, storedSession(token)] as const);
 };
 
-/** Records every URL the page lands on, so a one-frame flash is still catchable. */
+/**
+ * Records every URL the page lands on, so a one-frame flash is still catchable.
+ *
+ * The landing page is filtered out: it is only ever the seeding step, and its
+ * navigation event can arrive late enough to land in a tracker armed after it.
+ */
 const trackNavigations = (page: Page): string[] => {
 	const visited: string[] = [];
 	page.on('framenavigated', (frame) => {
-		if (frame === page.mainFrame()) {
+		if (frame === page.mainFrame() && new URL(frame.url()).pathname !== '/') {
 			visited.push(frame.url());
 		}
 	});
@@ -164,12 +174,19 @@ test.describe('session restore', () => {
 
 		// The guard moves the user once and leaves them there. A redirect wired
 		// to every failing in-flight request instead of to the state transition
-		// would show up here as a bounce between the two routes.
+		// would show up as a bounce back to /chat after landing.
+		//
+		// Note this counts *arrivals*, not `framenavigated` events: Next's App
+		// Router fires two of those for the initial /chat document (commit, then
+		// hydration), so event-counting reads a correct single redirect as two.
+		// What matters is that nothing navigates again once we reach /login.
+		await page.waitForTimeout(500);
 		const paths = visited.map((url) => new URL(url).pathname);
+		const landed = paths.indexOf('/login');
+
 		expect(paths.at(0)).toBe('/chat');
-		expect(paths.at(-1)).toBe('/login');
-		expect(paths.filter((path) => path === '/chat')).toHaveLength(1);
-		expect(new Set(paths)).toEqual(new Set(['/chat', '/login']));
+		expect(landed).toBeGreaterThan(-1);
+		expect(paths.slice(landed)).toEqual(['/login']);
 
 		// The dead token is not left on disk to be retried on the next boot.
 		expect(await page.evaluate((key) => window.localStorage.getItem(key), STORAGE_KEY)).toBeNull();
