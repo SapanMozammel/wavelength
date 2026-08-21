@@ -212,10 +212,11 @@ state. The replay's cursor is local to `use-scripted-replay`.
 - [⬜] imports from `components/layout/chat/panel/`, **not a copy**
 - [⬜] `prefers-reduced-motion` → the full transcript renders statically
 
-`e2e/landing.spec.ts`:
+`e2e/landing.spec.ts` — **written, not executed** (ports 8000/8001 were held by
+concurrent work; run `pnpm exec playwright test e2e/landing.spec.ts` before push):
 - [⬜] axe clean at 360 / 768 / 1280 / 1920
 - [⬜] no horizontal scroll at any of those widths
-- [⬜] hero login → lands on `/chat` authenticated
+- [⬜] hero login → lands on `/chat` authenticated — `test.fixme`, blocked on step 3
 - [⬜] `<h1>` present, metadata and OG tags correct
 
 ## Performance
@@ -250,21 +251,34 @@ state. The replay's cursor is local to `use-scripted-replay`.
 
 ## Implementation Steps
 
-- [⬜] **1 — Page shell + sections.** Server-rendered skeleton of all five
+- [✅] **1 — Page shell + sections.** Server-rendered skeleton of all five
   sections with real copy, no interactivity. Confirm it renders with JS disabled.
-- [⬜] **2 — Hero layout + `SignalRings`.** CSS keyframes, `wakeStatus`-driven
-  opacity, `aria-hidden`.
+- [✅] **2 — Hero layout + `SignalRings`.** CSS keyframes, `wakeStatus`-driven
+  opacity, `aria-hidden`. Shipped as a **Server** Component rather than a client
+  one: `wakeStatus` lives in `chat-slice`, which `09-cold-start-narration` has
+  not landed, so there is no status to read and no reason to ship the JS. Seam:
+  `// TODO(blocked-on-09)` in `hero/signal-rings.tsx`.
 - [⬜] **3 — `HeroLoginField`.** Reuse `use-login-form` verbatim. Verify by test
   that no validation logic is duplicated.
-- [⬜] **4 — `replay-script.ts`.** A canned transcript typed as `Message[]`, with
+  **Blocked on `03-auth-session` step 2** — `src/hooks/use-login-form.ts` does
+  not exist yet. The field is built as a presentational shell with final markup,
+  labels, autocomplete hints, an empty `role='alert'` region and layout; the
+  wiring seam is `// TODO(blocked-on-03)` in
+  `src/components/layout/landing/hero/hero-login-field.tsx`.
+- [✅] **4 — `replay-script.ts`.** A canned transcript typed as `Message[]`, with
   relative timestamps; write it to show off run grouping and a day separator.
 - [⬜] **5 — `use-scripted-replay` + `Replay`.** Timer, `IntersectionObserver`
   gating, reduced-motion static fallback. Import the real chat components.
-- [⬜] **6 — Claims + identity-model sections.** Server, prose-led, one visual each.
-- [⬜] **7 — Footer + metadata + OG image + JSON-LD.**
-- [⬜] **8 — Responsive pass.** 360 / 768 / 1280 / 1920. Hero legible and CTA
+  **Blocked on `05-message-list`** — `src/components/layout/chat/panel/` does not
+  exist yet. The section frame and the full static transcript are built (which is
+  also the reduced-motion rendering this plan requires, so no content is gated
+  behind motion); the swap seam is `// TODO(blocked-on-05)` in
+  `src/components/layout/landing/replay/index.tsx`.
+- [✅] **6 — Claims + identity-model sections.** Server, prose-led, one visual each.
+- [✅] **7 — Footer + metadata + OG image + JSON-LD.**
+- [✅] **8 — Responsive pass.** 360 / 768 / 1280 / 1920. Hero legible and CTA
   reachable without scrolling at 360×640.
-- [⬜] **9 — Light/dark pass.** Both deliberate; the light variant must not read
+- [✅] **9 — Light/dark pass.** Both deliberate; the light variant must not read
   as an afterthought.
 - [⬜] **10 — Tests + e2e + Lighthouse.**
 - [⬜] **11 — Gate.** `pnpm run check:all`, `pnpm run test`, `pnpm run build`,
@@ -273,15 +287,24 @@ state. The replay's cursor is local to `use-scripted-replay`.
 ## Verification
 
 - [⬜] `grep -rn "'use client'" src/components/layout/landing` returns **exactly
-      three** files
-- [⬜] `src/app/page.tsx` has no `'use client'`
-- [⬜] The replay imports from `components/layout/chat/panel/`, not a copy
-- [⬜] The hero field imports `use-login-form`, with no duplicated validation
-- [⬜] No horizontal scroll at 360 / 768 / 1280 / 1920
-- [⬜] Lighthouse ≥95 performance and accessibility
-- [⬜] Axe clean, light and dark
-- [⬜] Reduced motion: rings settle, replay renders statically, nothing is lost
-- [⬜] Zero testimonials, FAQs, pricing tables, or logo clouds
+      three** files — currently **one** (`hero-login-field.tsx`). `Replay` is a
+      Server Component until step 5, and `SignalRings` until step 9's `wakeStatus`
+      exists. Re-check when both land.
+- [✅] `src/app/page.tsx` has no `'use client'`
+- [⬜] The replay imports from `components/layout/chat/panel/`, not a copy —
+      blocked on step 5; that directory does not exist yet
+- [⬜] The hero field imports `use-login-form`, with no duplicated validation —
+      blocked on step 3; no validation logic has been duplicated in the shell
+- [✅] No horizontal scroll at 360 / 768 / 1280 / 1920 — measured in headless
+      Chromium against `next start`, light and dark
+- [⬜] Lighthouse ≥95 performance and accessibility — not run
+- [✅] Axe clean, light and dark — `wcag2a` + `wcag2aa`, all four widths, both
+      themes. Two light-theme contrast failures were found and fixed by adding a
+      `pulse-700` token; `pulse-600` is 2.9:1 on a light surface
+- [✅] Reduced motion: rings settle, replay renders statically, nothing is lost —
+      every `.animate-rise*` element measured at opacity 1 under
+      `prefers-reduced-motion: reduce`
+- [✅] Zero testimonials, FAQs, pricing tables, or logo clouds
 
 ## Risks & Open Questions
 

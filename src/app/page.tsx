@@ -1,21 +1,52 @@
-import Link from 'next/link';
+import Claims from '@/components/layout/landing/claims';
+import SiteFooter from '@/components/layout/landing/footer';
+import Hero from '@/components/layout/landing/hero';
+import IdentityModel from '@/components/layout/landing/identity-model';
+import JsonLd from '@/components/layout/landing/json-ld';
+import Replay from '@/components/layout/landing/replay';
+import SiteHeader from '@/components/layout/landing/site-header';
+import type { Metadata } from 'next';
+
+const TITLE = "Wavelength — a number, a name, and you're on the air";
+const DESCRIPTION = 'A real-time chat built on phone-number identity. No password, no verification email, and no sign-up form — the request that logs you in is the one that creates you.';
+
+export const metadata: Metadata = {
+	title: { absolute: TITLE },
+	description: DESCRIPTION,
+	alternates: { canonical: '/' },
+	openGraph: {
+		type: 'website',
+		siteName: 'Wavelength',
+		url: '/',
+		title: TITLE,
+		description: DESCRIPTION,
+	},
+	twitter: {
+		card: 'summary_large_image',
+		title: TITLE,
+		description: DESCRIPTION,
+	},
+};
 
 /**
- * Part 2 — the landing page. Scaffolded here so routing and the design tokens
- * are wired end to end; the full creative build is tracked in
- * `.claude/plans/landing-page/prd.md`.
+ * Part 2 — the landing page.
+ *
+ * A Server Component, and it stays one. The only client island on the page is
+ * the hero's login field; every section below it is text and layout, so the
+ * largest contentful paint is the headline rather than a hydrated widget.
  */
 const LandingPage = () => (
-	<main id='main' className='mx-auto flex min-h-dvh max-w-3xl flex-col items-center justify-center gap-6 px-6 text-center'>
-		<p className='text-signal-600 dark:text-signal-300 font-mono text-xs tracking-[0.3em] uppercase'>Wavelength</p>
-		<h1 className='font-display text-4xl leading-tight font-semibold text-balance sm:text-6xl'>A number, a name, and you are on the air.</h1>
-		<p className='text-ink-muted dark:text-ink-muted-dark max-w-xl text-pretty'>
-			Real-time messaging with no passwords and no sign-up form. Scaffold in place — the landing page build is planned in <code className='font-mono text-sm'>.claude/plans/landing-page</code>.
-		</p>
-		<Link href='/chat' className='bg-signal-600 hover:bg-signal-700 rounded-full px-6 py-3 text-sm font-medium text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2'>
-			Open the app
-		</Link>
-	</main>
+	<>
+		<SiteHeader />
+		<main id='main'>
+			<Hero />
+			<Replay />
+			<Claims />
+			<IdentityModel />
+		</main>
+		<SiteFooter />
+		<JsonLd />
+	</>
 );
 
 export default LandingPage;
