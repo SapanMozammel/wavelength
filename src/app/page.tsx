@@ -6,7 +6,7 @@ import Link from 'next/link';
  * `.claude/plans/landing-page/prd.md`.
  */
 const LandingPage = () => (
-	<main className='mx-auto flex min-h-dvh max-w-3xl flex-col items-center justify-center gap-6 px-6 text-center'>
+	<main id='main' className='mx-auto flex min-h-dvh max-w-3xl flex-col items-center justify-center gap-6 px-6 text-center'>
 		<p className='text-signal-600 dark:text-signal-300 font-mono text-xs tracking-[0.3em] uppercase'>Wavelength</p>
 		<h1 className='font-display text-4xl leading-tight font-semibold text-balance sm:text-6xl'>A number, a name, and you are on the air.</h1>
 		<p className='text-ink-muted dark:text-ink-muted-dark max-w-xl text-pretty'>

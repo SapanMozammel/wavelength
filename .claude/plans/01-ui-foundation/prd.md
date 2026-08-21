@@ -184,29 +184,29 @@ a `pnpm build` bundle check confirms the full metadata build did not sneak in.
 
 ## Implementation Steps
 
-- [⬜] **1 — Install dependencies.** `pnpm add` the six Radix packages, `sonner`,
+- [✅] **1 — Install dependencies.** `pnpm add` the six Radix packages, `sonner`,
   `libphonenumber-js`. Verify `pnpm build` still passes before writing any component.
-- [⬜] **2 — `useMountEffect`.** Create `src/hooks/use-mount-effect.ts` exactly as
+- [✅] **2 — `useMountEffect`.** Create `src/hooks/use-mount-effect.ts` exactly as
   specified in `workflow/no-use-effect.md`, with the eslint-disable comment. This
   is the only place `useEffect` is called in the app outside `src/hooks/`.
-- [⬜] **3 — Phone utilities.** `src/lib/utils/phone.ts` over `libphonenumber-js/min`.
+- [✅] **3 — Phone utilities.** `src/lib/utils/phone.ts` over `libphonenumber-js/min`.
   `normalizePhone` returns E.164 or `null`; `formatPhoneAsYouType` drives the login
   field; `isValidPhone` gates submit. Unit-test first — a bad normalizer produces
   unfindable accounts, which is invisible until a second user searches.
-- [⬜] **4 — Presentational primitives.** Skeleton, Spinner, Badge, EmptyState,
+- [✅] **4 — Presentational primitives.** Skeleton, Spinner, Badge, EmptyState,
   ErrorState, Logo. Server components, tokens only, no `'use client'`.
-- [⬜] **5 — Form primitives.** Button (cva: `primary` / `secondary` / `ghost` /
+- [✅] **5 — Form primitives.** Button (cva: `primary` / `secondary` / `ghost` /
   `danger` × `sm` / `md` / `lg`), IconButton (required `label`), Input, Textarea,
   Label, Checkbox.
-- [⬜] **6 — Overlay + layout primitives.** Dialog, Sheet, DropdownMenu, Tooltip,
+- [✅] **6 — Overlay + layout primitives.** Dialog, Sheet, DropdownMenu, Tooltip,
   Popover wrapper, Separator, ScrollArea, Avatar (initials fallback derived from
   `User.name`).
-- [⬜] **7 — Toaster + theme toggle.** Mount `<Toaster />` in `providers/index.tsx`
+- [✅] **7 — Toaster + theme toggle.** Mount `<Toaster />` in `providers/index.tsx`
   with `richColors` off and token-matched styling. Build `theme-toggle.tsx` on
   `useTheme`, guarding hydration per `rendering-hydration-no-flicker`.
-- [⬜] **8 — Shell polish.** `<body>` background tokens, a skip link to `#main`,
+- [✅] **8 — Shell polish.** `<body>` background tokens, a skip link to `#main`,
   and confirm the global focus ring survives every primitive.
-- [⬜] **9 — Gate.** `pnpm run format:all`, `pnpm run check:all`, `pnpm run test`,
+- [✅] **9 — Gate.** `pnpm run format:all`, `pnpm run check:all`, `pnpm run test`,
   `pnpm run build`.
 
 ## Verification

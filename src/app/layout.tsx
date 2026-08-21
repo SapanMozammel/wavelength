@@ -1,3 +1,4 @@
+import SkipLink from '@/components/layout/common/skip-link';
 import { env } from '@/lib/env';
 import Providers from '@/providers';
 import '@/styles/global.scss';
@@ -39,8 +40,11 @@ type RootLayoutProps = {
 
 const RootLayout = ({ children }: RootLayoutProps) => (
 	<html lang='en' suppressHydrationWarning className={`${inter.variable} ${outfit.variable}`}>
-		<body>
-			<Providers>{children}</Providers>
+		<body className='min-h-dvh'>
+			<Providers>
+				<SkipLink />
+				{children}
+			</Providers>
 		</body>
 	</html>
 );
