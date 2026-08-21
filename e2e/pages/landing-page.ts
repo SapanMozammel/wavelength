@@ -24,8 +24,11 @@ export class LandingPage {
 		this.heading = page.getByRole('heading', { level: 1 });
 		this.openAppLink = page.getByRole('link', { name: /open the app/i });
 		this.loginPageLink = page.getByRole('link', { name: /use the login page/i });
-		this.phoneField = page.getByLabel(/phone number/i);
-		this.nameField = page.getByLabel(/display name/i);
+		// Scoped to the textbox role, not getByLabel: the form carries an sr-only
+		// legend naming both fields ("...with a phone number and a display name"),
+		// so a loose label match resolves to the form as well as the input.
+		this.phoneField = page.getByRole('textbox', { name: 'Phone number', exact: true });
+		this.nameField = page.getByRole('textbox', { name: 'Display name', exact: true });
 		this.submitButton = page.getByRole('button', { name: /go on the air/i });
 		this.replaySection = page.locator('#replay');
 		this.claimsSection = page.locator('#claims');

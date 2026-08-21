@@ -56,26 +56,32 @@ const mockAuthApi = async (page: Page) => {
  * rather than with `addInitScript`, so the write happens once and the app is
  * free to clear the key without this putting it straight back.
  *
- * The landing page is used deliberately — never `/login` or `/chat`. Chromium
- * can deliver the `framenavigated` event for this navigation *after* `goto`
- * resolves, so seeding on `/login` leaves a stray `/login` in any tracker the
- * test arms next, and a correct app then reads as one that redirected.
+ * Seeded from a route that is neither under test nor expensive. `/login` is
+ * out because Chromium can deliver that navigation's `framenavigated` event
+ * after `goto` resolves, leaving a stray `/login` in a tracker armed next — a
+ * correct app then reads as one that redirected. `/` is out because it is the
+ * full landing page, and paying for its fonts and artwork on every seed makes
+ * the redirect assertions time out under a saturated six-project matrix. The
+ * 404 renders the same providers on a fraction of the work.
  */
 const seedSession = async (page: Page, token: string) => {
-	await page.goto('/');
+	await page.goto('/__seed');
 	await page.evaluate(([key, value]) => window.localStorage.setItem(key, value), [STORAGE_KEY, storedSession(token)] as const);
 };
 
 /**
  * Records every URL the page lands on, so a one-frame flash is still catchable.
  *
- * The landing page is filtered out: it is only ever the seeding step, and its
- * navigation event can arrive late enough to land in a tracker armed after it.
+ * Only the two routes under test are recorded. The seeding navigation is not
+ * one of them, and its event can arrive late enough to land in a tracker armed
+ * after it — which would read as a redirect that never happened.
  */
+const TRACKED_PATHS = new Set(['/login', '/chat']);
+
 const trackNavigations = (page: Page): string[] => {
 	const visited: string[] = [];
 	page.on('framenavigated', (frame) => {
-		if (frame === page.mainFrame() && new URL(frame.url()).pathname !== '/') {
+		if (frame === page.mainFrame() && TRACKED_PATHS.has(new URL(frame.url()).pathname)) {
 			visited.push(frame.url());
 		}
 	});
