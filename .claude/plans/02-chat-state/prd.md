@@ -161,13 +161,13 @@ into an `aria-live` region.
 
 `tests/store/chat-merge.test.ts` is written **first**, and covers:
 
-- [⬜] optimistic append then confirm → one message, server `id`, same index
-- [⬜] two concurrent optimistic sends confirm out of order → original order held
-- [⬜] socket arrival with an `id` already present → no-op, no duplicate
-- [⬜] socket arrival out of chronological order → inserted by `createdAt`
-- [⬜] older page prepends without disturbing the tail
-- [⬜] failed send stays in the list with `status: 'failed'`
-- [⬜] a page whose first element repeats the cursor → deduped (belt-and-braces;
+- [✅] optimistic append then confirm → one message, server `id`, same index
+- [✅] two concurrent optimistic sends confirm out of order → original order held
+- [✅] socket arrival with an `id` already present → no-op, no duplicate
+- [✅] socket arrival out of chronological order → inserted by `createdAt`
+- [✅] older page prepends without disturbing the tail
+- [✅] failed send stays in the list with `status: 'failed'`
+- [✅] a page whose first element repeats the cursor → deduped (belt-and-braces;
       `normalizeMessagePage` already strips it)
 
 `tests/store/chat-slice.test.ts` covers thunk lifecycles against a mocked
@@ -197,33 +197,33 @@ into an `aria-live` region.
 
 ## Implementation Steps
 
-- [⬜] **1 — Types.** Add `AsyncStatus` and `ChatErrorKind` to `src/types/chat.ts`.
-- [⬜] **2 — Merge tests, before merge code.** Write `chat-merge.test.ts` covering
+- [✅] **1 — Types.** Add `AsyncStatus` and `ChatErrorKind` to `src/types/chat.ts`.
+- [✅] **2 — Merge tests, before merge code.** Write `chat-merge.test.ts` covering
   all seven cases above against the intended signatures. They fail; that is the point.
-- [⬜] **3 — Merge functions.** Implement `chat-merge.ts` until step 2 is green.
+- [✅] **3 — Merge functions.** Implement `chat-merge.ts` until step 2 is green.
   Pure, no Redux import, no `immer` assumptions.
-- [⬜] **4 — Slice.** `chat-slice.ts` — initial state, sync reducers
+- [✅] **4 — Slice.** `chat-slice.ts` — initial state, sync reducers
   (`conversationOpened`, `socketStatusChanged`, `liveMessageReceived`,
   `unreadCleared`, `optimisticFailed`), delegating every list mutation to `chat-merge`.
-- [⬜] **5 — Thunks.** `fetchConversations`, `fetchMessages`, `fetchOlderMessages`,
+- [✅] **5 — Thunks.** `fetchConversations`, `fetchMessages`, `fetchOlderMessages`,
   `sendChatMessage`, `startDirect`, `createGroupConversation`. Each maps rejection
   through `classify()`.
-- [⬜] **6 — Unauthorized listener.** One listener middleware entry: any rejected
+- [✅] **6 — Unauthorized listener.** One listener middleware entry: any rejected
   thunk with `kind: 'unauthorized'` dispatches `sessionCleared` **once**, not per
   in-flight request.
-- [⬜] **7 — Selectors.** `chat-selectors.ts` with `createSelector`.
-- [⬜] **8 — Hooks.** `use-conversations.ts` and `use-thread.ts`, each using
+- [✅] **7 — Selectors.** `chat-selectors.ts` with `createSelector`.
+- [✅] **8 — Hooks.** `use-conversations.ts` and `use-thread.ts`, each using
   `useMountEffect` from plan 01 — no direct `useEffect`.
-- [⬜] **9 — Gate.** `pnpm run test` green, `pnpm run check:all` green.
+- [✅] **9 — Gate.** `pnpm run test` green, `pnpm run check:all` green.
 
 ## Verification
 
-- [⬜] `chat-merge.ts` imports nothing from Redux or React
-- [⬜] All seven merge cases pass
-- [⬜] `grep -rn "useEffect" src/store src/hooks` finds it only inside
+- [✅] `chat-merge.ts` imports nothing from Redux or React
+- [✅] All seven merge cases pass
+- [✅] `grep -rn "useEffect" src/store src/hooks` finds it only inside
       `use-mount-effect.ts`
-- [⬜] No component imports `chat-merge` directly — components use selectors
-- [⬜] `grep -rn "types/api" src/store` returns nothing
+- [✅] No component imports `chat-merge` directly — components use selectors
+- [✅] `grep -rn "types/api" src/store` returns nothing
 
 ## Risks & Open Questions
 
