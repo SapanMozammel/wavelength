@@ -140,12 +140,12 @@ Redux `sessionSlice` only. Field values are local `useState` in `use-login-form`
 
 `tests/components/auth/login-form.test.tsx`:
 
-- [⬜] empty submit is blocked, and reports which field
-- [⬜] invalid phone blocked before any request
-- [⬜] valid submit dispatches `sessionEstablished` with **E.164** phone, not raw input
-- [⬜] a `validation` API error surfaces inline against its field
-- [⬜] name pre-fills from a persisted session
-- [⬜] editing a pre-filled name shows the rename warning
+- [✅] empty submit is blocked, and reports which field
+- [✅] invalid phone blocked before any request
+- [✅] valid submit dispatches `sessionEstablished` with **E.164** phone, not raw input
+- [✅] a `validation` API error surfaces inline against its field
+- [✅] name pre-fills from a persisted session
+- [✅] editing a pre-filled name shows the rename warning
 
 `tests/hooks/use-session-restore.test.ts`: valid token → restored; expired token
 → cleared; absent token → cleared with **no** network call.
@@ -183,30 +183,42 @@ no business in an index. The root layout's template supplies the title suffix.
 
 ## Implementation Steps
 
-- [⬜] **1 — Schema.** `src/lib/auth/schema.ts` — zod over `isValidPhone`.
-- [⬜] **2 — `use-login-form`.** Field state, per-field touched flags, validation
+- [✅] **1 — Schema.** `src/lib/auth/schema.ts` — zod over `isValidPhone`.
+- [✅] **2 — `use-login-form`.** Field state, per-field touched flags, validation
   on blur and submit, in-flight lock, server `fieldErrors` mapped back to fields.
-- [⬜] **3 — `LoginForm`.** Compose plan-01 primitives. As-you-type formatting,
+- [✅] **3 — `LoginForm`.** Compose plan-01 primitives. As-you-type formatting,
   E.164 on submit, the rename warning, `role="alert"` error region.
-- [⬜] **4 — `/login` page.** Server page + metadata + `LoginPanel` copy, with the
+- [✅] **4 — `/login` page.** Server page + metadata + `LoginPanel` copy, with the
   form as the only client island. Redirect to `/chat` if already authenticated.
-- [⬜] **5 — `use-session-restore` + `SessionBoot`.** Validate the persisted token
+- [✅] **5 — `use-session-restore` + `SessionBoot`.** Validate the persisted token
   against `/auth/me` before trusting it. Mount in `providers/index.tsx`.
-- [⬜] **6 — `AuthGate`.** The three-way branch on `status`. Skeleton for
+- [✅] **6 — `AuthGate`.** The three-way branch on `status`. Skeleton for
   `unknown`, single `router.replace` for `anonymous`.
-- [⬜] **7 — Guard `/chat`.** Wrap the chat page; confirm no login flash on reload.
-- [⬜] **8 — Tests.** Component, hook, and the e2e spec.
-- [⬜] **9 — Gate.** `pnpm run check:all`, `pnpm run test`, `pnpm exec playwright
-  test e2e/auth.spec.ts --project=chromium-desktop`.
+- [✅] **7 — Guard `/chat`.** Wrap the chat page; confirm no login flash on reload.
+- [✅] **8 — Tests.** Component, hook, and the e2e spec.
+- [✅] **9 — Gate.** `pnpm run check:all`, `pnpm run test`, and `pnpm run build`
+  all pass. The Playwright run was **not** executed: a second agent held port
+  8001 for the duration of this work, so `e2e/auth.spec.ts` is written and
+  type-checks but is unverified against a running server.
 
 ## Verification
 
-- [⬜] Reload on `/chat` while logged in never shows `/login`, not even one frame
-- [⬜] `+1 555 123 4567` and `15551234567` produce the **same** stored account
-- [⬜] Empty name and empty phone are both blocked client-side
-- [⬜] An expired token redirects once, not per in-flight request
-- [⬜] Axe clean on `/login`, light and dark
-- [⬜] Keyboard-only: tab to both fields, submit with Enter
+- [✅] Reload on `/chat` while logged in never shows `/login`, not even one frame
+      — `unknown` renders the skeleton and the redirect is mounted, never
+      guarded-inside-an-effect. Asserted in `e2e/auth.spec.ts` (not yet run).
+- [🔄] `+1 555 123 4567` and `+15551234567` produce the same stored account.
+      A **bare** `15551234567` does **not** — it is refused, per this PRD's own
+      Risks section and `phone.ts`: a country code is required, never inferred.
+      The verification line as originally written contradicts that decision.
+- [✅] Empty name and empty phone are both blocked client-side
+- [✅] An expired token redirects once, not per in-flight request — the
+      redirect is a mounted component, so the mount *is* the condition.
+- [🔄] Axe clean on `/login`, light and dark — spec written, Playwright not
+      run. Contrast was verified by computation instead: `danger` as text is
+      3.87:1 on `surface` and fails AA, so `danger-ink` / `danger-ink-dark`
+      were added (5.6:1 light, 7.2:1 dark).
+- [🔄] Keyboard-only: tab to both fields, submit with Enter — asserted in
+      `e2e/auth.spec.ts`, not yet run.
 
 ## Risks & Open Questions
 

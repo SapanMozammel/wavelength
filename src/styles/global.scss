@@ -63,6 +63,12 @@
 	--color-danger: oklch(0.63 0.21 25);
 	--color-warning: oklch(0.78 0.15 78);
 
+	/* `danger` is tuned for fills, borders, and icons, where 3:1 is the bar.
+	 * As *text* it lands at 3.87:1 on `surface` and fails AA, so error copy uses
+	 * this darker pair instead: 5.6:1 on light, 7.2:1 on dark, same hue. */
+	--color-danger-ink: oklch(0.54 0.2 25);
+	--color-danger-ink-dark: oklch(0.74 0.16 25);
+
 	/* Type */
 	--font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 	--font-display: var(--font-outfit), var(--font-inter), ui-sans-serif, system-ui, sans-serif;

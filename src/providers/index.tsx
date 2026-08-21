@@ -1,5 +1,6 @@
 'use client';
 
+import SessionBoot from '@/components/layout/auth/session-boot';
 import Toaster from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { store } from '@/store';
@@ -13,6 +14,9 @@ type ProvidersProps = {
 
 const Providers = memo(({ children }: ProvidersProps) => (
 	<ReduxProvider store={store}>
+		{/* Validates the persisted token against /auth/me once per boot, before
+		    any guarded surface reads `session.status`. Renders nothing. */}
+		<SessionBoot />
 		<ThemeProvider attribute='class' defaultTheme='system' enableSystem disableTransitionOnChange>
 			<TooltipProvider delayDuration={300}>
 				{children}
