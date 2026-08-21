@@ -6,18 +6,31 @@ const listenerMiddleware = createListenerMiddleware();
 
 // Persist the session to localStorage from middleware rather than a component
 // effect, so it runs once per action and stays out of the render path.
+//
+// Every storage call is wrapped. Safari in private mode throws
+// `QuotaExceededError` from `setItem`, and an exception thrown inside listener
+// middleware propagates out of `dispatch()` — so an unguarded write would
+// white-screen the app on the line *after* a successful login. Failing to
+// persist degrades to "log in again next visit", which is survivable; failing
+// to catch is not. The read side (`@/lib/auth/storage`) fails soft to `null`
+// for the same reason, so a write that never lands is already tolerated.
 listenerMiddleware.startListening({
 	matcher: isAnyOf(sessionEstablished, sessionRestored, sessionCleared),
 	effect: (action, api) => {
 		if (typeof window === 'undefined') {
 			return;
 		}
-		if (sessionCleared.match(action)) {
-			localStorage.removeItem(SESSION_STORAGE_KEY);
-			return;
+		try {
+			if (sessionCleared.match(action)) {
+				localStorage.removeItem(SESSION_STORAGE_KEY);
+				return;
+			}
+			const { session } = api.getState() as RootState;
+			localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token: session.token, user: session.user }));
+		} catch {
+			// Storage unavailable (private mode, quota, disabled). The session
+			// still lives in memory for this tab; only persistence is lost.
 		}
-		const { session } = api.getState() as RootState;
-		localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token: session.token, user: session.user }));
 	},
 });
 
