@@ -1,0 +1,33 @@
+// Utility classes built on the keyframes in `_animations.scss`.
+
+.animate-bubble-in {
+	animation: wl-bubble-in 220ms var(--ease-out-expo) both;
+}
+
+.animate-pulse-ring {
+	animation: wl-pulse-ring 2.4s ease-out infinite;
+}
+
+.animate-typing-dot {
+	animation: wl-typing-dot 1.2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+	animation: wl-shimmer 1.6s linear infinite;
+	background-size: 200% 100%;
+}
+
+// The message list scrolls; hide its scrollbar chrome without losing the scroll.
+.scrollbar-subtle {
+	scrollbar-width: thin;
+	scrollbar-color: var(--color-border-subtle) transparent;
+
+	&::-webkit-scrollbar {
+		width: 0.5rem;
+	}
+
+	&::-webkit-scrollbar-thumb {
+		background-color: var(--color-border-subtle);
+		border-radius: 999px;
+	}
+}

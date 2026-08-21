@@ -1,0 +1,702 @@
+# Chat API — complete OpenAPI description.
+#
+# The upstream spec at https://frontend-task-chatapp.onrender.com/docs/ is
+# request-only: paths, methods, and request bodies, with no response bodies and
+# no status codes. This document keeps its paths and request shapes verbatim and
+# adds everything that was missing, derived by exercising the live server
+# (`pnpm api:probe`).
+#
+# Deviations from the live server are never invented here — where the server
+# behaves oddly the behaviour is documented as-is and annotated. The redesign
+# argument lives in redesign.md, deliberately outside this file.
+
+openapi: 3.1.0
+
+info:
+  title: Chat API
+  version: 1.0.0
+  description: |
+    Real-time 1-to-1 and group chat over REST + Socket.io.
+
+    ## Authentication
+    `POST /auth/login` is login and registration in one call — an unseen phone
+    number is registered, an existing one logs in. It returns a JWT (observed
+    lifetime: 7 days). Send it as `Authorization: Bearer <token>` on every other
+    route, and in the Socket.io handshake `auth.token`.
+
+    ## Two base URLs
+    REST lives under `/api`. **Socket.io lives at the origin root**, serving
+    itself at `<origin>/socket.io/`. So does `GET /health`, despite this
+    document's `servers` block — see that operation's description.
+
+    ## Identifiers and timestamps
+    Entities are keyed on `_id` (24-char Mongo ObjectId hex). REST timestamps are
+    ISO-8601 strings; **Socket.io timestamps are epoch milliseconds**, and socket
+    messages use `id` rather than `_id`. Normalize at the boundary.
+
+servers:
+  - url: '{baseUrl}/api'
+    description: Live deployment
+    variables:
+      baseUrl:
+        default: https://frontend-task-chatapp.onrender.com
+
+tags:
+  - name: Auth
+  - name: Users
+  - name: Conversations
+  - name: Messages
+  - name: Groups
+  - name: System
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in or register
+      description: |
+        One step for both. A new phone number is registered; an existing one logs
+        in.
+
+        Logging in with an existing phone and a different `name` **overwrites the
+        stored name** — there is no separate profile endpoint.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Logged in or registered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '400':
+          description: '`VALIDATION_ERROR` — `phone` or `name` missing'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Current user
+      description: Returns the user behind the bearer token. Used to validate a persisted session on boot.
+      responses:
+        '200':
+          description: A bare user object — note this is *not* wrapped in `{ user: … }` the way login wraps it
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400':
+          description: '`NO_TOKEN` — header absent. Semantically a 401; the server answers 400.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: '`INVALID_TOKEN` — malformed, expired, or wrong signature'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /users/search:
+    get:
+      tags: [Users]
+      summary: Search users by name or phone
+      description: |
+        Case-insensitive substring match against both name and phone.
+
+        Two documented deviations from this signature:
+
+        - **`q` is interpolated into a Mongo `$regex` unescaped.** A leading `+`
+          (every E.164 number) returns `500` with driver code `51091`. Strip
+          regex metacharacters before sending.
+        - **Omitting `q` returns every user** rather than the `400` its
+          `required: true` implies.
+
+        Results include the calling user; filter client-side.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: A user's name or phone number.
+          schema: { type: string }
+          example: Ada
+      responses:
+        '200':
+          description: Matching users — a bare array. These carry no `createdAt`, unlike the login user object.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/UserSummary' }
+        '400':
+          description: '`NO_TOKEN`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500':
+          description: '`q` contained a regex metacharacter; leaks a numeric MongoDB error code'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /conversations:
+    get:
+      tags: [Conversations]
+      summary: List my conversations
+      description: Direct and group, most-recently-updated first. The only endpoint using a `{ data: … }` envelope.
+      responses:
+        '200':
+          description: Conversation summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ConversationSummary' }
+        '400':
+          description: '`NO_TOKEN`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+    post:
+      tags: [Conversations]
+      summary: Start a direct conversation
+      description: |
+        Idempotent — calling twice with the same peer returns the existing
+        conversation rather than duplicating.
+
+        **The response is a stub**, not the shape this conversation has in
+        `GET /conversations`: no `type`, no `updatedAt`, and `participants` is an
+        array of id strings rather than resolved users. Contrast
+        `POST /conversations/group`, which returns a fully populated object.
+
+        **Passing your own `userId` does not error** — it returns an unrelated
+        existing conversation containing your id. Guard client-side.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StartConversationRequest' }
+      responses:
+        '200':
+          description: Created, or resolved to an existing conversation. Note `200`, not `201`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreatedDirectConversation' }
+        '400':
+          description: '`NO_TOKEN`, or `userId` missing'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /conversations/{id}/messages:
+    get:
+      tags: [Conversations]
+      summary: Get message history
+      description: |
+        **Newest-first (descending).** Reverse for display.
+
+        **`before` is inclusive** — `?before=X` returns X again as the first
+        element. Drop the cursor message client-side or every page boundary
+        duplicates a message.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          description: Messages per page. Server default appears to be 50.
+          schema: { type: integer }
+          example: 20
+        - name: before
+          in: query
+          required: false
+          description: Message id to page backwards from. Inclusive.
+          schema: { type: string }
+      responses:
+        '200':
+          description: One page of history
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessagePage' }
+        '404':
+          description: '`NOT_FOUND` — absent, or the caller is not a member. Correctly indistinguishable.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500':
+          description: '`id` is not a valid ObjectId. Leaks a raw Mongoose `CastError`; should be a 400.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /messages:
+    post:
+      tags: [Messages]
+      summary: Send a message
+      description: |
+        Works for direct and group conversations alike. Other participants
+        receive the message over Socket.io as `message:new`; **the sender does
+        not receive their own echo**.
+
+        **`""` and `"   "` are both accepted with a `200`.** There is no
+        server-side text validation — enforce it in the client.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SendMessageRequest' }
+      responses:
+        '200':
+          description: The stored message. Note `200`, not `201`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '404':
+          description: '`NOT_FOUND` — conversation absent or not the caller''s'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /conversations/group:
+    post:
+      tags: [Groups]
+      summary: Create a group
+      description: |
+        The creator becomes the first admin and counts toward the member
+        minimum, so `participantIds` needs at least **two** entries.
+
+        Unlike `POST /conversations`, this returns `201` and a fully populated
+        conversation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateGroupRequest' }
+      responses:
+        '201':
+          description: Group created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GroupConversation' }
+        '400':
+          description: |
+            `VALIDATION_ERROR`. Observed `details[].message` values:
+            `"name is required"`, `"a group needs at least 3 members"`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /conversations/{id}/participants:
+    post:
+      tags: [Groups]
+      summary: Add members to a group
+      description: Admins only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddParticipantsRequest' }
+      responses:
+        '200':
+          description: The updated group
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GroupConversation' }
+        '403':
+          description: '`FORBIDDEN` — caller is not an admin'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: '`NOT_FOUND`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /conversations/{id}/participants/{userId}:
+    delete:
+      tags: [Groups]
+      summary: Remove a member, or leave
+      description: Admins only — **except** that passing your own id is how any member leaves.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: userId
+          in: path
+          required: true
+          description: The member to remove; your own id to leave.
+          schema: { type: string }
+      responses:
+        '200':
+          description: The updated group
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GroupConversation' }
+        '403':
+          description: '`FORBIDDEN` — caller is not an admin and is not removing themselves'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: '`NOT_FOUND`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /conversations/{id}/admins:
+    post:
+      tags: [Groups]
+      summary: Promote a member to admin
+      description: Admins only. The target must already be a member. There is no demotion counterpart.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PromoteRequest' }
+      responses:
+        '200':
+          description: The updated group, with the new admin in `admins`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GroupConversation' }
+        '403':
+          description: '`FORBIDDEN`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: '`NOT_FOUND`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /conversations/{id}:
+    patch:
+      tags: [Groups]
+      summary: Rename a group
+      description: Admins only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RenameGroupRequest' }
+      responses:
+        '200':
+          description: The renamed group
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GroupConversation' }
+        '403':
+          description: '`FORBIDDEN` — `"Only admins can rename the group"`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: '`NOT_FOUND`'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      description: |
+        **This route is not under `/api`.** It lives at the origin root —
+        `https://frontend-task-chatapp.onrender.com/health`. Resolved against
+        this document's `servers` block it becomes `/api/health`, which returns
+        `404 NOT_FOUND`.
+
+        Useful for warming the free-tier deployment, which cold-starts after
+        inactivity and can take 30–60s on the first request.
+      security: []
+      responses:
+        '200':
+          description: Server is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: ok }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      required: [_id, name, phone]
+      properties:
+        _id: { type: string, example: 6a888073e5d6aac97523611b }
+        name: { type: string, example: Ada Lovelace }
+        phone: { type: string, example: '+15551234567' }
+        createdAt: { type: string, format: date-time }
+
+    UserSummary:
+      type: object
+      description: The user shape returned by search — no `createdAt`.
+      required: [_id, name, phone]
+      properties:
+        _id: { type: string }
+        name: { type: string }
+        phone: { type: string }
+
+    LoginRequest:
+      type: object
+      required: [phone, name]
+      properties:
+        phone: { type: string, example: '+15551234567' }
+        name: { type: string, example: Ada Lovelace }
+
+    LoginResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token: { type: string, description: 'JWT. Observed lifetime 7 days; claims are `sub`, `iat`, `exp`.' }
+        user: { $ref: '#/components/schemas/User' }
+
+    StartConversationRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+          description: The peer's id, from `/users/search`. Passing your own id returns an unrelated conversation.
+
+    SendMessageRequest:
+      type: object
+      required: [conversationId, text]
+      properties:
+        conversationId: { type: string }
+        text:
+          type: string
+          description: Not validated server-side — empty and whitespace-only strings are accepted.
+          example: Hello!
+
+    CreateGroupRequest:
+      type: object
+      required: [name, participantIds]
+      properties:
+        name: { type: string, example: Project Team }
+        participantIds:
+          type: array
+          description: Members besides you. At least 2, since a group needs 3 total.
+          items: { type: string }
+
+    AddParticipantsRequest:
+      type: object
+      required: [userIds]
+      properties:
+        userIds:
+          type: array
+          items: { type: string }
+
+    PromoteRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId: { type: string }
+
+    RenameGroupRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, example: Renamed Team }
+
+    Message:
+      type: object
+      description: |
+        The REST message shape. The Socket.io `message:new` payload carries the
+        same data under different keys — `id` instead of `_id`, and `createdAt`
+        as epoch milliseconds instead of an ISO string.
+      required: [_id, conversation, sender, text, createdAt]
+      properties:
+        _id: { type: string }
+        conversation: { type: string, description: Conversation id. Never populated. }
+        sender: { type: string, description: Sender's user id. Never populated. }
+        text: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    MessagePage:
+      type: object
+      required: [messages, hasMore]
+      properties:
+        messages:
+          type: array
+          description: Newest-first. No total count is available.
+          items: { $ref: '#/components/schemas/Message' }
+        hasMore: { type: boolean }
+
+    LastMessage:
+      description: |
+        A message preview, or an **empty object** (not `null`) when the
+        conversation has no messages yet.
+      oneOf:
+        - type: object
+          required: [text, sender, createdAt]
+          properties:
+            text: { type: string }
+            sender: { type: string }
+            createdAt: { type: string, format: date-time }
+        - type: object
+          additionalProperties: false
+          description: No messages yet.
+
+    ConversationSummary:
+      description: |
+        A discriminated union on `type`. A `direct` row carries a singular
+        resolved `participant`; a `group` row carries plural `participants` plus
+        `name`, `admins`, and `createdBy`. Reading the wrong one yields
+        `undefined`.
+      oneOf:
+        - $ref: '#/components/schemas/DirectConversationSummary'
+        - $ref: '#/components/schemas/GroupConversationSummary'
+      discriminator:
+        propertyName: type
+        mapping:
+          direct: '#/components/schemas/DirectConversationSummary'
+          group: '#/components/schemas/GroupConversationSummary'
+
+    DirectConversationSummary:
+      type: object
+      required: [_id, type, lastMessage, updatedAt, participant]
+      properties:
+        _id: { type: string }
+        type: { type: string, const: direct }
+        lastMessage: { $ref: '#/components/schemas/LastMessage' }
+        updatedAt: { type: string, format: date-time }
+        participant:
+          allOf: [{ $ref: '#/components/schemas/UserSummary' }]
+          description: The other person. Singular, and already resolved.
+
+    GroupConversationSummary:
+      type: object
+      required: [_id, type, lastMessage, updatedAt, name, createdBy, admins, participants]
+      properties:
+        _id: { type: string }
+        type: { type: string, const: group }
+        lastMessage: { $ref: '#/components/schemas/LastMessage' }
+        updatedAt: { type: string, format: date-time }
+        name: { type: string }
+        createdBy: { type: string }
+        admins:
+          type: array
+          items: { type: string }
+        participants:
+          type: array
+          description: Includes the caller.
+          items: { $ref: '#/components/schemas/UserSummary' }
+
+    CreatedDirectConversation:
+      type: object
+      description: |
+        The stub returned by `POST /conversations` — deliberately documented
+        separately from `DirectConversationSummary`, because the same
+        conversation has a different shape in the list endpoint.
+      required: [_id, participants, createdAt]
+      properties:
+        _id: { type: string }
+        participants:
+          type: array
+          description: Id strings, not resolved user objects.
+          items: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    GroupConversation:
+      type: object
+      description: Returned by every group endpoint, consistently and fully populated.
+      required: [_id, type, name, createdBy, admins, participants, createdAt, updatedAt]
+      properties:
+        _id: { type: string }
+        type: { type: string, const: group }
+        name: { type: string }
+        createdBy: { type: string }
+        admins:
+          type: array
+          items: { type: string }
+        participants:
+          type: array
+          items: { $ref: '#/components/schemas/UserSummary' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [message, code]
+          properties:
+            message: { type: string }
+            code:
+              description: |
+                Normally a string (`NO_TOKEN`, `INVALID_TOKEN`,
+                `VALIDATION_ERROR`, `NOT_FOUND`, `FORBIDDEN`, `SERVER_ERROR`).
+                Unhandled driver errors leak a **numeric** MongoDB code instead.
+              oneOf:
+                - { type: string }
+                - { type: integer }
+            details:
+              type: array
+              description: Present on validation errors only.
+              items:
+                type: object
+                required: [path, message]
+                properties:
+                  path: { type: string }
+                  message: { type: string }
+
+# ---------------------------------------------------------------------------
+# Socket.io — outside OpenAPI's scope, recorded here so the contract is in one
+# place. Connect to the ORIGIN ROOT, not the /api base:
+#
+#   io('https://frontend-task-chatapp.onrender.com', { auth: { token } })
+#
+# client → server
+#   message:send   { conversationId, text }  → ack { ok: true }   (no message body)
+#
+# server → client
+#   message:new    { id, conversation, sender, text, createdAt }
+#                  NOTE: `id` (not `_id`) and epoch-ms `createdAt` (not ISO).
+#                  NOTE: the sender does NOT receive their own echo.
+#   conversation:updated   a group the caller belongs to changed
+#
+# An absent or invalid token is rejected at handshake via `connect_error`
+# carrying "Invalid token".
+# ---------------------------------------------------------------------------

@@ -1,0 +1,122 @@
+@use 'tailwindcss';
+@use './tokens';
+@use './animations';
+@use './utilities';
+
+/* Tailwind v4 auto-detects sources across the whole repo. Documentation here
+ * discusses Tailwind itself and contains illustrative bracket-form classes such
+ * as `bg-[url(...)]`; scanned literally, those compile to real CSS containing
+ * `url(...)`, which the bundler then tries to resolve as a module and the build
+ * dies with "Can't resolve '...'".
+ *
+ * Prose is never a source of real class names in this project, so every prose
+ * format is excluded wholesale rather than listing directories — a new doc at
+ * any path must not be able to break the build. */
+@source not '../../**/*.md';
+@source not '../../**/*.mdx';
+@source not '../../**/*.yaml';
+@source not '../../**/*.yml';
+
+/* Dark mode is class-driven (next-themes), not media-driven. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------------------
+ * Design tokens — the single source for colour, type, and radius.
+ * Values are oklch so light/dark pairs stay perceptually matched.
+ * ------------------------------------------------------------------------- */
+@theme {
+	/* Brand — the "signal" ramp, violet through cyan. */
+	--color-signal-50: oklch(0.97 0.02 285);
+	--color-signal-100: oklch(0.94 0.04 285);
+	--color-signal-200: oklch(0.88 0.08 285);
+	--color-signal-300: oklch(0.79 0.13 285);
+	--color-signal-400: oklch(0.7 0.18 285);
+	--color-signal-500: oklch(0.62 0.22 285);
+	--color-signal-600: oklch(0.54 0.23 285);
+	--color-signal-700: oklch(0.46 0.2 285);
+	--color-signal-800: oklch(0.38 0.16 285);
+	--color-signal-900: oklch(0.3 0.12 285);
+
+	--color-pulse-400: oklch(0.82 0.14 195);
+	--color-pulse-500: oklch(0.74 0.16 195);
+	--color-pulse-600: oklch(0.64 0.15 195);
+
+	/* Surfaces */
+	--color-canvas: oklch(0.99 0.003 285);
+	--color-surface: oklch(1 0 0);
+	--color-surface-raised: oklch(0.97 0.006 285);
+	--color-border-subtle: oklch(0.91 0.008 285);
+
+	--color-canvas-dark: oklch(0.17 0.012 285);
+	--color-surface-dark: oklch(0.21 0.014 285);
+	--color-surface-raised-dark: oklch(0.25 0.016 285);
+	--color-border-subtle-dark: oklch(0.31 0.018 285);
+
+	/* Text */
+	--color-ink: oklch(0.24 0.012 285);
+	--color-ink-muted: oklch(0.52 0.014 285);
+	--color-ink-dark: oklch(0.95 0.006 285);
+	--color-ink-muted-dark: oklch(0.71 0.012 285);
+
+	/* Status */
+	--color-success: oklch(0.72 0.16 152);
+	--color-danger: oklch(0.63 0.21 25);
+	--color-warning: oklch(0.78 0.15 78);
+
+	/* Type */
+	--font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+	--font-display: var(--font-outfit), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+	--font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', monospace;
+
+	/* Radius */
+	--radius-bubble: 1.125rem;
+	--radius-panel: 1rem;
+
+	/* Motion */
+	--ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@layer base {
+	:root {
+		color-scheme: light;
+	}
+
+	.dark {
+		color-scheme: dark;
+	}
+
+	html {
+		-webkit-font-smoothing: antialiased;
+		text-rendering: optimizeLegibility;
+	}
+
+	body {
+		background-color: var(--color-canvas);
+		color: var(--color-ink);
+		font-family: var(--font-sans);
+	}
+
+	.dark body {
+		background-color: var(--color-canvas-dark);
+		color: var(--color-ink-dark);
+	}
+
+	/* Focus ring — one definition, applied everywhere. */
+	:focus-visible {
+		outline: 2px solid var(--color-signal-500);
+		outline-offset: 2px;
+	}
+
+	/* Honour the OS setting globally; individual components need no guard. */
+	@media (prefers-reduced-motion: reduce) {
+		*,
+		*::before,
+		*::after {
+			animation-duration: 0.01ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.01ms !important;
+			scroll-behavior: auto !important;
+		}
+	}
+}

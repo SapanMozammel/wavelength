@@ -1,0 +1,15 @@
+// SCSS-side constants that CSS custom properties cannot express (media query
+// breakpoints, z-index scale). Tailwind tokens live in `global.scss` @theme.
+
+$breakpoint-sm: 40rem;
+$breakpoint-md: 48rem;
+$breakpoint-lg: 64rem;
+$breakpoint-xl: 80rem;
+
+$z-message-list: 1;
+$z-day-separator: 5;
+$z-composer: 10;
+$z-header: 20;
+$z-overlay: 40;
+$z-modal: 50;
+$z-toast: 60;

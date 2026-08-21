@@ -1,0 +1,12 @@
+node_modules
+.next
+out
+build
+dist
+coverage
+public
+pnpm-lock.yaml
+*.min.js
+*.min.css
+.claude/skills/external
+CHANGELOG.md
