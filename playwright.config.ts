@@ -5,6 +5,13 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = Number(process.env.E2E_PORT ?? 8001);
 const BASE_URL = `http://localhost:${PORT}`;
 
+	// `realtime.spec.ts` talks to the live API and registers real accounts. What
+	// it proves — the server's socket fan-out — is identical in every browser, so
+	// it runs on one project only. Running it across the matrix would buy no
+	// extra signal and would leave a dozen throwaway users and conversations per
+	// run on a server other people are sharing.
+	const LIVE_API_SPEC = /realtime\.spec\.ts/;
+
 const config = defineConfig({
 	testDir: './e2e',
 	fullyParallel: true,
@@ -35,22 +42,27 @@ const config = defineConfig({
 		},
 		{
 			name: 'firefox-desktop',
+			testIgnore: LIVE_API_SPEC,
 			use: { ...devices['Desktop Firefox'], viewport: { width: 1280, height: 800 }, locale: 'en-US' },
 		},
 		{
 			name: 'webkit-desktop',
+			testIgnore: LIVE_API_SPEC,
 			use: { ...devices['Desktop Safari'], viewport: { width: 1280, height: 800 }, locale: 'en-US' },
 		},
 		{
 			name: 'mobile-chromium',
+			testIgnore: LIVE_API_SPEC,
 			use: { ...devices['Pixel 7'] },
 		},
 		{
 			name: 'mobile-webkit',
+			testIgnore: LIVE_API_SPEC,
 			use: { ...devices['iPhone 15'] },
 		},
 		{
 			name: 'dark-mode',
+			testIgnore: LIVE_API_SPEC,
 			use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 }, locale: 'en-US', colorScheme: 'dark' },
 		},
 	],
