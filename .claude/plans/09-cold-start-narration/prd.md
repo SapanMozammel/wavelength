@@ -124,11 +124,26 @@ probe runs once for the whole app regardless of entry route.
 
 ## Data & Types
 
-`src/types/chat.ts`:
+`src/lib/api/health.ts` (**not** `src/types/chat.ts` — see the note below):
 
 ```ts
 export type WakeStatus = 'unknown' | 'waking' | 'awake' | 'unreachable';
 ```
+
+> **Deviation, taken deliberately.** The plan put `WakeStatus` in
+> `src/types/chat.ts`. It ships from `src/lib/api/health.ts` instead. Two
+> reasons: the probe is the only thing that can produce one of these values, so
+> the type has no meaning apart from it; and `src/types/chat.ts` was being
+> edited concurrently by plan 04, so adding a line there would have been a
+> merge conflict for no gain. `chat-slice` imports the type from
+> `@/lib/api/health`.
+
+`chat-slice` carries four wake fields, not one. `wakeStatus` is the app-wide
+fact; `wakeStartedAt` is what lets a surface mounted mid-wait count from the
+real beginning rather than from its own mount; `wakeAttempt` is `WakeBoot`'s
+remount key, which is how retry re-fires the probe without an effect dependency
+array; and `wakeNarrated` is what gates the closing acknowledgement, so a warm
+load stays silent end to end instead of flashing *"Server's awake."*
 
 `src/lib/api/health.ts` — `probeHealth(signal)` hits
 `${NEXT_PUBLIC_SOCKET_URL}/health` (the **origin**, deliberately not the `/api`
@@ -168,23 +183,40 @@ a global store.
 
 ## Testing Strategy
 
-`tests/hooks/use-api-wake.test.ts` (fake timers):
-- [⬜] a probe resolving in 300ms → status goes `unknown` → `awake`, and
-      **`waking` is never entered** (no narration on a warm server)
-- [⬜] a probe outstanding at 2.5s → `waking`
-- [⬜] copy escalates at the 8s / 25s / 45s boundaries
-- [⬜] resolution at 40s → `awake`, narration dismisses
-- [⬜] no resolution by the budget → `unreachable` with a working retry
+`tests/hooks/use-api-wake.test.ts` (fake timers) — 16 tests, all passing:
+- [✅] a probe resolving in 300ms → status goes `unknown` → `awake`, and
+      **`waking` is never entered** (no narration on a warm server). Asserted
+      three ways: the recorded transition list, `wakeNarrated === false`, and a
+      walk past 2.5s proving the threshold timer was *cleared*, not out-raced
+- [✅] a probe outstanding at 2.5s → `waking` (and still `unknown` at 2.499s)
+- [✅] copy escalates at the 8s / 25s / 45s boundaries — asserted against
+      `wakeCopyFor`, a pure function, so the boundaries need no clock
+- [✅] resolution at 40s → `awake`, `wakeNarrated` kept for the acknowledgement
+- [✅] no resolution by the budget → `unreachable`, retrying stops, and
+      `wakeRetryRequested` resets the state and bumps the remount key
+- [✅] *added* — a fast failure re-probes rather than declaring `unreachable`.
+      Render answers 502 while a service spins up, so a 50ms failure means
+      "not yet", not "dead"
+- [✅] *added* — unmount aborts the probe and fires nothing further
 
-`tests/components/common/wake-notice.test.tsx`:
-- [⬜] renders nothing at `unknown` and at `awake`
-- [⬜] `waking` renders `role="status"`, not `role="alert"`
-- [⬜] `unreachable` renders `role="alert"` and a retry control
+`tests/components/common/wake-notice.test.tsx` — 7 tests, all passing:
+- [✅] renders nothing at `unknown` and at `awake` (the warm-server path:
+      `awake` reached without passing through `waking` renders an empty DOM)
+- [✅] `waking` renders `role="status"` with `aria-live="polite"`, and no
+      `role="alert"`; the copy names the cause instead of saying "loading"
+- [✅] the elapsed counter is `aria-hidden`
+- [✅] `unreachable` renders `role="alert"` and a focusable retry that actually
+      re-probes (bumps `wakeAttempt`) rather than just dismissing itself
 
-`e2e/cold-start.spec.ts`: route-intercept `/health` with a 5s delay → the
-narration appears; intercept with an immediate 200 → it never appears. The second
-assertion is the important one — a narration that shows on every load is noise,
-not a feature.
+`e2e/cold-start.spec.ts` — **written, not yet run.** Three tests: a 12s
+intercepted `/health` (narration appears, escalates, acknowledges, leaves); a
+refused connection (alert + a retry that succeeds once the route is cleared);
+and an immediate 200 (nothing ever appears). The last is the important one — a
+narration that shows on every load is noise, not a feature.
+
+> Not executed in this pass: concurrent agents held ports 8000/8001. Run
+> `pnpm exec playwright test e2e/cold-start.spec.ts --project=chromium-desktop`
+> once the tree is merged.
 
 ## Performance
 
@@ -197,12 +229,13 @@ wait becomes abnormal.
 
 - `src/providers/index.tsx` — mount `WakeBoot`
 - `src/store/slices/chat-slice.ts` — `wakeStatus` + `wakeStatusChanged`
-- `src/types/chat.ts` — `WakeStatus`
+- ~~`src/types/chat.ts` — `WakeStatus`~~ → moved to `src/lib/api/health.ts`
 - `src/components/layout/auth/login-form.tsx` — render `WakeNotice` under submit
 - `src/components/layout/chat/sidebar/conversation-list.tsx` — use it as the
-  loading state
+  loading state — **TODO(blocked-on-04)**, see step 6
 - `src/components/layout/chat/panel/composer-status.tsx` — `connecting` during a
-  cold start says "Waking the server", not "Reconnecting"
+  cold start says "Waking the server", not "Reconnecting" —
+  **TODO(blocked-on-06)**, see step 6
 - `README.md` — the write-up section on this bonus
 
 ## New Files
@@ -216,32 +249,83 @@ wait becomes abnormal.
 
 ## Implementation Steps
 
-- [⬜] **1 — `probeHealth`.** `src/lib/api/health.ts` against the **origin root**.
-  Confirm by hand that `/api/health` 404s and `/health` returns `{"status":"ok"}`
-  — the whole feature rests on hitting the right one.
-- [⬜] **2 — `WakeStatus` + slice field.**
-- [⬜] **3 — `use-api-wake`.** Probe + elapsed timer + the 2.5s threshold + the
-  escalation boundaries. Unit-test with fake timers **before** any UI.
-- [⬜] **4 — `WakeNotice`.** Escalating copy, breathing dot, elapsed counter,
-  `awake` acknowledgement, `unreachable` + retry.
-- [⬜] **5 — `WakeBoot`** in `providers/index.tsx`, beside `SessionBoot`.
-- [⬜] **6 — Three placements.** Login, conversation-list loading, composer status.
-- [⬜] **7 — Landing hookup.** Expose `wakeStatus` for plan 10's hero rings.
-- [⬜] **8 — Tests + e2e.**
-- [⬜] **9 — Write-up.** A short, specific section in `README.md` Part 3: what was
-  observed, why it matters, what was built. The bonus is only credited if the
-  reviewer understands it was deliberate.
-- [⬜] **10 — Gate.** `pnpm run check:all`, `pnpm run test`, e2e on chromium-desktop.
+- [✅] **1 — `probeHealth`.** `src/lib/api/health.ts`, against the **origin
+  root**. Confirmed by hand against the live deployment before a line of it was
+  written:
+
+  ```
+  GET https://frontend-task-chatapp.onrender.com/health
+      → 200  {"status":"ok"}   access-control-allow-origin: *
+  GET https://frontend-task-chatapp.onrender.com/api/health
+      → 404  {"error":{"message":"Route not found","code":"NOT_FOUND"}}
+  ```
+
+  The CORS risk flagged under *Risks* is **closed**: `/health` answers
+  `access-control-allow-origin: *`, so the fallback mechanism is not needed.
+- [✅] **2 — `WakeStatus` + slice fields.** Type in `src/lib/api/health.ts`;
+  `wakeStatus` / `wakeStartedAt` / `wakeAttempt` / `wakeNarrated` plus
+  `wakeProbeStarted` / `wakeStatusChanged` / `wakeAcknowledged` /
+  `wakeRetryRequested` in `chat-slice`.
+- [✅] **3 — `use-api-wake`.** Probe + retry loop + elapsed timer + the 2.5s
+  threshold + the escalation boundaries. Unit-tested with fake timers **before**
+  any UI was written, per the plan.
+- [✅] **4 — `WakeNotice`.** Escalating copy, breathing dot on the existing
+  `animate-pulse-ring`, `aria-hidden` elapsed counter, `awake` acknowledgement
+  gated on `wakeNarrated`, `unreachable` + focusable retry.
+- [✅] **5 — `WakeBoot`** in `providers/index.tsx`, beside `SessionBoot`,
+  keyed on `wakeAttempt` so a retry remounts it rather than needing an effect
+  dependency array.
+- [🔄] **6 — Three placements.** One of three landed.
+  - [✅] `/login` — `WakeNotice` under the submit button in `login-form.tsx`.
+  - [⬜] `TODO(blocked-on-04)` — conversation-list loading state.
+    `src/components/layout/chat/sidebar/conversation-list.tsx` is owned by plan
+    04 and was being written concurrently. Drop-in: render `<WakeNotice />`
+    above the skeleton in the `loading` branch. No new state is needed — the
+    component reads `chat.wakeStatus` itself and returns `null` when the server
+    is warm, so it is safe to place unconditionally.
+  - [⬜] `TODO(blocked-on-06)` — composer status.
+    `src/components/layout/chat/panel/composer-status.tsx` is owned by plan 06.
+    Drop-in: when `socketStatus === 'connecting'` **and**
+    `chat.wakeStatus === 'waking'`, say *"Waking the server…"* instead of
+    *"Reconnecting…"*. One state, one story — that consistency is what
+    separates this from a one-off loading string.
+- [⬜] **7 — Landing hookup** — plan 10's file, not touched here. Nothing is
+  blocking it: `wakeStatus` is already in the store and readable with
+  `useAppSelector((state) => state.chat.wakeStatus)`. Rings at full strength on
+  `awake`, dimmed on `waking`.
+- [✅] **8 — Tests.** 23 new unit/component tests, all passing.
+  `e2e/cold-start.spec.ts` is written but not executed — see *Testing Strategy*.
+- [⬜] **9 — Write-up.** `README.md` Part 3 section. Not written in this pass;
+  `README.md` is shared across plans and was left to the integrating pass.
+- [🔄] **10 — Gate.** `format:all`, `lint`, `type:check`, `test` (144 passed),
+  and `build` all green. Playwright deliberately not run — concurrent agents
+  held the ports.
 
 ## Verification
 
-- [⬜] Warm server → the narration **never appears** (the load-bearing check)
-- [⬜] Genuinely cold server → narration appears at ~2.5s and escalates
-- [⬜] On wake → acknowledgement, then dismissal
-- [⬜] Unreachable → an error with a retry that actually re-probes
-- [⬜] The same explanation appears on login, chat, and landing — one state, one story
-- [⬜] Screen reader: announced politely; the counter is not read aloud
-- [⬜] `grep -rn "api/health" src` returns nothing — the probe must hit the origin root
+- [✅] Warm server → the narration **never appears** (the load-bearing check).
+  Proven at both levels: `use-api-wake.test.ts` asserts a 300ms probe never
+  enters `waking`, and `wake-notice.test.tsx` asserts an `awake` reached without
+  narration renders an empty DOM.
+- [✅] Genuinely cold server → narration appears at ~2.5s and escalates —
+  verified under fake timers at the 2.5s / 8s / 25s / 45s boundaries.
+- [✅] On wake → acknowledgement, then dismissal (`useWakeDismissal`: 2.4s hold,
+  400ms fade, then `wakeAcknowledged` clears it for every placement at once).
+- [✅] Unreachable → `role="alert"` with a retry that bumps `wakeAttempt`,
+  remounting `WakeBoot`'s probe. Asserted in the component test.
+- [🔄] The same explanation on login, chat, and landing — login done; chat and
+  landing are the two `TODO` seams in step 6 and step 7.
+- [🔄] Screen reader: `role="status"` + `aria-live="polite"` on the narration,
+  `role="alert"` on `unreachable`, and the counter carries `aria-hidden="true"`
+  so it is removed from the accessibility tree and the live region diffs only
+  the copy. Asserted structurally in the component test; **not** yet confirmed
+  against a real screen reader.
+- [✅] No source builds a `/api` + `/health` URL. Note the PRD's original grep
+  (`grep -rn "api/health" src`) now has an unavoidable false positive: the
+  module itself lives at `src/lib/api/health.ts`, so its own import path
+  matches. The check that means what was intended:
+  `grep -n "API_BASE_URL" src/lib/api/health.ts` → no match, i.e. the probe
+  never reads the `/api` base. It reads `NEXT_PUBLIC_SOCKET_URL`, the origin.
 
 ## Risks & Open Questions
 
@@ -254,7 +338,9 @@ wait becomes abnormal.
   before it appears.
 - **Escalating copy risks feeling chatty.** Keep it to one short line at a time,
   never stacked, never animated between states beyond a crossfade.
-- **`/health` has no CORS guarantee** — the probe must handle a network-level
-  rejection as `unreachable` rather than throwing uncaught. Verify against the
-  live server early; if CORS blocks it, fall back to timing the first real
-  request instead, which changes the mechanism but not the feature.
+- ~~**`/health` has no CORS guarantee**~~ — **closed.** The live server answers
+  `access-control-allow-origin: *`, so the browser probe is permitted and the
+  fallback (timing the first real request) is not needed. The defensive
+  handling was kept regardless: `probeHealth` converts any network-level
+  rejection into `false` rather than throwing, so an offline client or a future
+  CORS change degrades to `unreachable` instead of an uncaught rejection.
