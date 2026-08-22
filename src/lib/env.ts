@@ -13,7 +13,18 @@ const DEFAULT_SOCKET_URL = 'https://frontend-task-chatapp.onrender.com';
  * page's JSON-LD) are Server Components, so this never has to agree with a
  * client render.
  */
-const devSiteUrl = (): string => `http://localhost:${process.env.PORT ?? '3000'}`;
+const devSiteUrl = (): string => {
+	// Vercel injects VERCEL_URL (host only, no scheme) into every build, including
+	// previews. Falling back to it means a deployment where NEXT_PUBLIC_SITE_URL
+	// was forgotten still resolves `metadataBase` to itself rather than to
+	// localhost — which is the difference between an Open Graph tag that works
+	// and one that points at the machine it was built on.
+	const vercelHost = read('VERCEL_URL');
+	if (vercelHost !== undefined) {
+		return `https://${vercelHost}`;
+	}
+	return `http://localhost:${process.env.PORT ?? '3000'}`;
+};
 
 const read = (key: string): string | undefined => {
 	const value = process.env[key];
