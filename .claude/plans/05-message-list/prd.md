@@ -141,6 +141,7 @@ guidance, so it attaches exactly when the sentinel mounts.
 | `src/components/layout/chat/panel/index.tsx` | Client | composes; owns `key` |
 | `src/components/layout/chat/panel/panel-header.tsx` | Client | title, group actions |
 | `src/components/layout/chat/panel/message-list.tsx` | Client | scroll refs, observer |
+| `src/components/layout/chat/panel/message-list-view.tsx` | Client | presentational; takes rows as a prop |
 | `src/components/layout/chat/panel/message-row.tsx` | Client | `memo`, run geometry |
 | `src/components/layout/chat/panel/message-bubble.tsx` | Client | `memo`, hover state |
 | `src/components/layout/chat/panel/day-separator.tsx` | **Server** | pure presentational |
@@ -149,6 +150,14 @@ guidance, so it attaches exactly when the sentinel mounts.
 | `src/components/layout/chat/panel/load-older-sentinel.tsx` | Client | callback-ref observer |
 | `src/lib/chat/build-rows.ts` | pure module | testable without React |
 | `src/hooks/use-scroll-anchor.ts` | Client hook | `useLayoutEffect` on the DOM |
+
+**`MessageListView` is split out from `MessageList`** — added during
+implementation, not in the original table. The container owns the store, the
+scroll ref and the observer; the view owns the markup and takes `rows`,
+`status`, `hasMore` and callbacks as props, importing no store, no `useThread`
+and no selector. Two consumers need exactly that boundary: the real container,
+and the landing page's scripted replay, which must render the product's own
+message geometry without pulling chat state into a server-rendered bundle.
 
 `build-rows.ts` being a plain module is deliberate — grouping, day breaks and run
 geometry are the logic most likely to have off-by-one bugs, and they are cheapest
@@ -164,6 +173,9 @@ New, in `src/types/chat.ts`:
 ```ts
 export type MessageRunPosition = 'single' | 'first' | 'middle' | 'last';
 ```
+
+Also added: `conversationParticipants(conversation)`, so the panel header and
+the row builder resolve members the same way for both conversation kinds.
 
 `Row` lives in `src/lib/chat/build-rows.ts` — a render concern, not a domain type.
 
@@ -216,27 +228,28 @@ list on every scroll frame.
 
 `tests/lib/chat/build-rows.test.ts` — the highest-value tests in the plan:
 
-- [⬜] two messages on different days produce exactly one day separator between them
-- [⬜] three consecutive messages from one sender inside 5 minutes → one run,
+- [✅] two messages on different days produce exactly one day separator between them
+- [✅] three consecutive messages from one sender inside 5 minutes → one run,
       positions `first` / `middle` / `last`
-- [⬜] the same three spanning 6 minutes → two runs
-- [⬜] a day break splits a run even when the messages are 1 minute apart
-- [⬜] alternating senders → four `single` runs, no collapsing
-- [⬜] a `senderId` absent from participants → `sender: null`
-- [⬜] `isOwn` is true only for the session user's id
-- [⬜] an empty array → an empty row list, no phantom separator
+- [✅] the same three spanning 6 minutes → two runs
+- [✅] a day break splits a run even when the messages are 1 minute apart
+- [✅] alternating senders → four `single` runs, no collapsing
+- [✅] a `senderId` absent from participants → `sender: null`
+- [✅] `isOwn` is true only for the session user's id
+- [✅] an empty array → an empty row list, no phantom separator
 
-`tests/components/chat/message-list.test.tsx`:
-- [⬜] own and other bubbles carry distinct alignment classes **and** distinct
+`tests/components/chat/message-list-view.test.tsx` — the view renders from plain
+props, so all of this runs with no Provider and no fixture store:
+- [✅] own and other bubbles carry distinct alignment classes **and** distinct
       corner classes, not just distinct colours
-- [⬜] every message renders a `<time dateTime>` with the ISO value
-- [⬜] group conversation: sender name shows once per run, on the first row
-- [⬜] direct conversation: no sender names at all
-- [⬜] loading → skeleton bubbles; empty → invitation; error → retry
-- [⬜] an older-page error keeps already-loaded messages on screen
+- [✅] every message renders a `<time dateTime>` with the ISO value
+- [✅] group conversation: sender name shows once per run, on the first row
+- [✅] direct conversation: no sender names at all
+- [✅] loading → skeleton bubbles; empty → invitation; error → retry
+- [✅] an older-page error keeps already-loaded messages on screen
 
 `e2e/message-list.spec.ts`: open a conversation with history → messages render
-oldest-first, axe clean.
+oldest-first, axe clean. **Deferred** — needs the chat shell from plan 04.
 
 ## Performance
 
@@ -251,57 +264,100 @@ oldest-first, axe clean.
 
 ## Affected Files
 
-- `src/types/chat.ts` — add `MessageRunPosition`
+- `src/types/chat.ts` — add `MessageRunPosition` and `conversationParticipants`
 - `src/components/layout/chat/chat-shell.tsx` — mount the panel with
-  `key={conversationId}`
+  `key={conversationId}`. **Deferred to plan 04**, which owns that file.
+- `src/components/layout/landing/replay/index.tsx` — adopt `MessageListView` in
+  place of its copied transcript markup. **Deferred**; owned by the landing plan.
 
 ## New Files
 
-- `src/components/layout/chat/panel/*.tsx` — the nine components above
+- `src/components/layout/chat/panel/*.tsx` — the components above
 - `src/lib/chat/build-rows.ts`
 - `src/hooks/use-scroll-anchor.ts`
 - `tests/lib/chat/build-rows.test.ts`
-- `tests/components/chat/message-list.test.tsx`
+- `tests/components/chat/message-list-view.test.tsx`
 - `e2e/message-list.spec.ts`
 
 ## Implementation Steps
 
-- [⬜] **1 — `build-rows` tests first.** All eight cases above, written against the
-  intended signature before any implementation exists.
-- [⬜] **2 — `build-rows.ts`.** One pass: day breaks, run positions, sender
-  resolution, `isOwn`. Green step 1 before continuing.
-- [⬜] **3 — `MessageBubble`.** Three-signal sender distinction, run-aware corner
+- [✅] **1 — `build-rows` tests first.** All eight cases above, written against the
+  intended signature before any implementation exists. Confirmed red (unresolved
+  import) before step 2 existed.
+- [✅] **2 — `build-rows.ts`.** One pass: day breaks, run positions, sender
+  resolution, `isOwn`. 18 cases green.
+- [✅] **3 — `MessageBubble`.** Three-signal sender distinction, run-aware corner
   radii, `<time>` on every message, `sr-only` accessible name.
-- [⬜] **4 — `DaySeparator`, `MessageSkeleton`, `EmptyThread`.** Server components.
-- [⬜] **5 — `MessageRow`.** Avatar placement at run end, group sender name on run
-  start, `memo`.
-- [⬜] **6 — `MessageList`.** Native `overflow-y-auto` container, `role="log"`,
-  `aria-live="polite"`, `tabIndex={0}`, rows from `build-rows`.
-- [⬜] **7 — All four states.** Initial loading, empty, initial error, older-page
-  error — the last one must preserve loaded messages.
-- [⬜] **8 — `use-scroll-anchor` + `LoadOlderSentinel`.** `IntersectionObserver`
-  via callback ref; `scrollHeight`-delta restoration in `useLayoutEffect` inside
-  the hook. Verify by hand against a conversation with 3+ pages.
-- [⬜] **9 — `PanelHeader`.** Title, subtitle, participant avatars, back control
-  on mobile.
-- [⬜] **10 — Tests + e2e.**
-- [⬜] **11 — Gate.** `pnpm run check:all`, `pnpm run test`, e2e on chromium-desktop.
+- [✅] **4 — `DaySeparator`, `MessageSkeleton`, `EmptyThread`.** No `'use client'`
+  directive — no state, no events, so they compile into whichever bundle imports
+  them rather than forcing a boundary.
+- [✅] **5 — `MessageRow`.** Avatar at run end over a reserved gutter, group sender
+  name on run start, `memo` on primitive props only.
+- [✅] **5a — `MessageListView`.** The presentational list: `role="log"`,
+  `aria-live="polite"`, `aria-relevant="additions"`, `aria-busy`, `tabIndex={0}`,
+  accessible name, `mt-auto` so a short thread rests on the composer. Rows,
+  status and callbacks all arrive as props; it imports no store. Added to the
+  plan during implementation — see the Component Type Decision note.
+- [⬜] **6 — `MessageList`.** The store-connected container: `useThread`,
+  `buildRows` in a `useMemo`, `MessageListView` underneath.
+  **Blocked on plan 04** — the chat shell and its conversation state are that
+  plan's, and this container is the seam between them. Seam left at
+  `message-list-view.tsx` (`topSlot`, `scrollRef`, `onReload`, `onLoadOlder`).
+- [🔄] **7 — All four states.** Initial loading, empty, initial error, older-page
+  error — all four render in `MessageListView` and are covered by tests. The
+  older-page error is a strip above the list and keeps every loaded message on
+  screen. Marked in progress rather than done because the states are not yet
+  driven by real thread status; that arrives with step 6.
+- [⬜] **8 — `use-scroll-anchor` + `LoadOlderSentinel`.** **Blocked on plan 04** —
+  both attach to the container from step 6. `MessageListView` deliberately owns
+  no observer and no scroll ref of its own so they can be handed in.
+- [✅] **9 — `PanelHeader`.** Title, subtitle (formatted phone for a direct
+  thread, member count for a group), avatar cluster, back control on mobile.
+  Trailing-edge seams left for the plan 07 connection indicator and plan 08
+  group actions.
+- [🔄] **10 — Tests + e2e.** 18 unit cases for `build-rows`, 15 component cases
+  for `MessageListView`. `e2e/message-list.spec.ts` is **deferred** — it needs a
+  reachable `/chat` shell from plan 04.
+- [🔄] **11 — Gate.** `format:all`, `lint`, `type:check`, `test` (154 passed) and
+  `build` all green. Playwright **not run** — other agents hold the ports.
 
 ## Verification
 
 - [⬜] Scroll to top on a conversation with 3+ pages: content prepends and the
-      viewport **does not move**
-- [⬜] Greyscale the screen — sender and receiver are still unambiguous
-- [⬜] Every bubble has a `<time dateTime>` with a valid ISO value
-- [⬜] No `Invalid Date` anywhere, including for socket-delivered messages
-- [⬜] No duplicate React keys at any page boundary
-- [⬜] Group: sender names appear once per run; direct: never
-- [⬜] Axe clean on `/chat`, light and dark
-- [⬜] Keyboard: tab into the list, PageUp/PageDown scroll it
-- [⬜] `grep -rn "useEffect\|_id" src/components/layout/chat` returns nothing
+      viewport **does not move** — blocked on step 8, itself blocked on plan 04
+- [🔄] Greyscale the screen — sender and receiver are still unambiguous.
+      Asserted **structurally**: tests check that own and received rows differ in
+      alignment class *and* corner class, and that the avatar appears only on
+      received rows. Not yet confirmed by eye on `/chat`, which does not render
+      the panel until plan 04 lands.
+- [✅] Every bubble has a `<time dateTime>` with a valid ISO value — including
+      the in-run bubbles whose timestamp is `sr-only`
+- [✅] No `Invalid Date` anywhere, including for socket-delivered messages
+- [✅] No duplicate React keys at any page boundary — day rows are keyed by
+      calendar day, not by the message that happens to open one, so a prepended
+      page cannot collide or churn
+- [✅] Group: sender names appear once per run; direct: never
+- [⬜] Axe clean on `/chat`, light and dark — blocked on plan 04
+- [⬜] Keyboard: tab into the list, PageUp/PageDown scroll it — the container is
+      `tabIndex={0}` and natively scrollable, asserted in tests, but not yet
+      exercised in a browser
+- [✅] `grep -rn "useEffect\|_id" src/components/layout/chat` returns nothing
 
 ## Risks & Open Questions
 
+- **`content-visibility: auto` was not applied.** The PRD flags it as capable of
+  fighting the scroll anchor, and the anchor (step 8) is not built yet, so
+  adding it now would mean tuning a perf hint against a behaviour nobody can
+  observe. Revisit once step 8 exists and only if profiling asks for it.
+- **`aria-live` on a container that swaps skeletons for a full history** would
+  announce the whole first page as an addition. Mitigated with `aria-busy` while
+  `status === 'loading'`; worth re-checking against a real screen reader once
+  the panel is reachable.
+- **The row's accessible name duplicates its content.** Each row carries
+  `aria-label="<Sender>, <time>: <text>"` so a live-region announcement names
+  the speaker, which alignment gives sighted users for free. A user browsing
+  linearly may hear the time twice — once from the label, once from the
+  `sr-only` `<time>`. Naming the speaker was judged the larger win.
 - **The 5-minute run threshold is a judgement call**, not from the brief. It is a
   single named constant so it can be tuned in one place.
 - **`content-visibility: auto` can cause scrollbar jitter** on some engines when
