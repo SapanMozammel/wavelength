@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 8001;
+// A dedicated port so a running `pnpm dev` is never disturbed by a test run,
+// and overridable so neither is a hard dependency.
+const PORT = Number(process.env.E2E_PORT ?? 8001);
 const BASE_URL = `http://localhost:${PORT}`;
 
 const config = defineConfig({

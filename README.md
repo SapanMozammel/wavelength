@@ -21,14 +21,14 @@ Requires Node 20+ and pnpm 9+.
 ```bash
 pnpm install
 cp .env.example .env.local     # defaults already point at the live API
-pnpm dev                       # http://localhost:8000
+pnpm dev                       # prints the URL it picked (default :3000)
 ```
 
 ### Scripts
 
 | Command | Does |
 |---|---|
-| `pnpm dev` | Dev server on port 8000 |
+| `pnpm dev` | Dev server. Set `PORT` to pin it; otherwise Next picks the first free port from 3000 |
 | `pnpm build` | Production build |
 | `pnpm test` | Vitest unit + component tests |
 | `pnpm test:e2e` | Playwright, 6-project matrix, port 8001 |

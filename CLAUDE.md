@@ -33,7 +33,7 @@ pnpm run format:all    # Organize imports + Prettier + ESLint fix
 # Test & build
 pnpm run test          # Vitest (run once)
 pnpm run build         # Production build
-pnpm run dev           # Dev server on port 8000
+pnpm run dev           # Dev server — Next picks the port ($PORT, else 3000)
 
 # Run before push
 pnpm run test:e2e      # Playwright (6-project matrix, port 8001)
