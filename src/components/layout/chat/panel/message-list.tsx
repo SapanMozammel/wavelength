@@ -8,6 +8,7 @@ import { useScrollAnchor } from '@/hooks/use-scroll-anchor';
 import { useThread } from '@/hooks/use-thread';
 import { buildRows } from '@/lib/chat/build-rows';
 import { cn } from '@/lib/utils';
+import { useAppSelector } from '@/store/hooks';
 import { conversationParticipants, conversationTitle, type Conversation } from '@/types/chat';
 import { memo, useMemo } from 'react';
 
@@ -32,8 +33,17 @@ type MessageListProps = {
  */
 const MessageList = memo(({ conversation, currentUserId, className }: MessageListProps) => {
 	const { messages, status, olderStatus, hasMore, error, loadOlder, reload } = useThread(conversation.id);
+	const currentUser = useAppSelector((state) => state.session.user);
 
-	const participants = useMemo(() => conversationParticipants(conversation), [conversation]);
+	/**
+	 * The session user is appended deliberately. `conversationParticipants`
+	 * returns only other people — the API never includes the caller — but the row
+	 * builder needs the full sender universe, or an own message resolves to
+	 * "Former member". Nothing renders that today, because own rows say "You" and
+	 * carry no avatar; it is added so the first thing that *does* render it is
+	 * not a bug report.
+	 */
+	const participants = useMemo(() => (currentUser === null ? conversationParticipants(conversation) : [...conversationParticipants(conversation), currentUser]), [conversation, currentUser]);
 	const rows = useMemo(
 		// A direct thread never labels its runs: the only other name in the room
 		// is already in the panel header, so repeating it on every bubble is noise.
