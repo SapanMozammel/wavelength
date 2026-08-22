@@ -1,5 +1,6 @@
 'use client';
 
+import ChatPanel from '@/components/layout/chat/panel';
 import Sidebar from '@/components/layout/chat/sidebar';
 import Avatar from '@/components/ui/avatar';
 import EmptyState from '@/components/ui/empty-state';
@@ -29,6 +30,7 @@ import { memo, useCallback } from 'react';
 const ChatShell = memo(() => {
 	const dispatch = useAppDispatch();
 	const conversation = useAppSelector(selectActiveConversation);
+	const currentUserId = useAppSelector((state) => state.session.user?.id ?? null);
 
 	const handleBack = useCallback(() => {
 		dispatch(conversationClosed());
@@ -64,12 +66,11 @@ const ChatShell = memo(() => {
 							</div>
 						</header>
 
-						{/* TODO(blocked-on-05): the message list, day separators, and the
-						    composer mount here. Plan 05 owns this region; until then the
-						    panel proves selection works and nothing else. */}
-						<div className='flex min-h-0 flex-1 flex-col justify-center'>
-							<EmptyState icon={<IconMessages aria-hidden='true' className='size-8' />} title='Messages land here next' description='The message list and composer arrive with the next slice of work.' />
-						</div>
+						{/* Keyed on the conversation so switching threads remounts rather
+						    than re-synchronising: history refetches, the scroll anchor
+						    starts fresh, and no thread is ever rendered against another's
+						    participants. See `no-use-effect` rule 5. */}
+						{currentUserId !== null && <ChatPanel key={conversation.id} conversation={conversation} currentUserId={currentUserId} />}
 					</>
 				)}
 			</section>
