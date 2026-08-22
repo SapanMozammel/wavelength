@@ -116,6 +116,31 @@ export const failOptimistic = (thread: Thread, clientId: string): Thread => {
 };
 
 /**
+ * Drops a failed send, at the user's explicit request.
+ *
+ * The `failed` guard is the whole safety of this function: it can only ever
+ * remove a message that never reached the server, so there is no path by which
+ * "Dismiss" deletes something another participant has already read. The control
+ * is worded "Dismiss" rather than "Delete" for the same reason — this API
+ * offers no message deletion, and implying otherwise would promise something
+ * the product cannot do.
+ *
+ * Nothing calls this automatically. A failed message that vanished on its own
+ * would be indistinguishable from one that was delivered.
+ */
+export const dismissOptimistic = (thread: Thread, clientId: string): Thread => {
+	const pending = thread.byId[clientId];
+	if (pending === undefined || pending.status !== 'failed') {
+		return thread;
+	}
+
+	const byId = { ...thread.byId };
+	delete byId[clientId];
+
+	return { ...thread, byId, orderedIds: thread.orderedIds.filter((id) => id !== clientId) };
+};
+
+/**
  * Upper-bound binary search over `orderedIds` by `createdAt`.
  *
  * Ties land after the message already held, so a burst delivered within the

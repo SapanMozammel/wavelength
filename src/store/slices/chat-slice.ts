@@ -4,7 +4,7 @@ import type { WakeStatus } from '@/lib/api/health';
 import type { SocketStatus } from '@/lib/socket/client';
 import type { AsyncStatus, ChatError, ChatErrorKind, Conversation, Message, MessagePage, User } from '@/types/chat';
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import { appendHistory, appendOptimistic, confirmOptimistic, emptyThread, failOptimistic, prependPage, receiveLive, type OptimisticMessage, type Thread } from './chat-merge';
+import { appendHistory, appendOptimistic, confirmOptimistic, dismissOptimistic, emptyThread, failOptimistic, prependPage, receiveLive, type OptimisticMessage, type Thread } from './chat-merge';
 
 /**
  * The chat state container.
@@ -63,7 +63,12 @@ const initialState: ChatState = {
 	threads: {},
 	activeConversationId: null,
 	unread: {},
-	socketStatus: 'disconnected',
+	// `connecting`, not `disconnected`: at boot no socket has been created
+	// yet, which is a connection that has not happened — not one that dropped.
+	// The distinction is load-bearing, because `disconnected` blocks the
+	// composer (see `canSendOnSocket`) and an initial value that blocks sending
+	// would lock the composer for every user who has not connected yet.
+	socketStatus: 'connecting',
 	wakeStatus: 'unknown',
 	wakeStartedAt: null,
 	wakeAttempt: 0,
@@ -375,6 +380,16 @@ const chatSlice = createSlice({
 			const { conversationId, clientId } = action.payload;
 			applyToThread(state, conversationId, (thread) => failOptimistic(thread, clientId));
 		},
+
+		/**
+		 * The user gave up on a failed send. Only ever dispatched from the
+		 * message's own "Dismiss" control — never on a timer, and never as a
+		 * side effect of a failure.
+		 */
+		optimisticDismissed: (state, action: PayloadAction<{ conversationId: string; clientId: string }>) => {
+			const { conversationId, clientId } = action.payload;
+			applyToThread(state, conversationId, (thread) => dismissOptimistic(thread, clientId));
+		},
 	},
 	extraReducers: (builder) => {
 		builder
@@ -454,6 +469,7 @@ export const {
 	unreadCleared,
 	optimisticAppended,
 	optimisticFailed,
+	optimisticDismissed,
 	wakeProbeStarted,
 	wakeStatusChanged,
 	wakeAcknowledged,
