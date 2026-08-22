@@ -122,18 +122,74 @@ test.describe('landing page accessibility', () => {
 	});
 });
 
+/**
+ * The page's bonus claim is that its primary CTA *is* the whole onboarding, so
+ * these assert the claim rather than the markup. Every API call is intercepted:
+ * login on this API is account creation, and a spec run against the live server
+ * would register a user per run and rename it on the next.
+ */
 test.describe('landing page onboarding', () => {
-	// Blocked on `.claude/plans/03-auth-session`: the hero field is a
-	// presentational shell until `use-login-form` exists, so submitting it
-	// deliberately does nothing. Unskip together with the wiring.
-	test.fixme('the hero login lands on /chat, authenticated', async ({ page }) => {
+	const USER = { _id: 'user-1', name: 'Priya', phone: '+15551230134' };
+
+	test.beforeEach(async ({ page }) => {
+		await page.route('**/api/auth/login', async (route) => {
+			const body = route.request().postDataJSON() as { phone: string; name: string };
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({ token: 'valid.jwt.token', user: { ...USER, phone: body.phone, name: body.name } }),
+			});
+		});
+		await page.route('**/api/auth/me', async (route) => {
+			await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(USER) });
+		});
+	});
+
+	/**
+	 * The hero form is a client island, and Playwright waits on the DOM rather
+	 * than on React attaching. Submitting before hydration lets the browser send
+	 * the form natively — which is exactly how a phone number ends up in the
+	 * address bar. As-you-type grouping is a behaviour only the hydrated form
+	 * produces, so it is the gate.
+	 */
+	const hydrate = async (landing: LandingPage) => {
+		await landing.phoneField.fill('+1555');
+		await expect(landing.phoneField).toHaveValue('+1 555');
+		await landing.phoneField.fill('');
+	};
+
+	test('the hero login lands on /chat, authenticated', async ({ page }) => {
 		const landing = new LandingPage(page);
 		await landing.goto();
+		await hydrate(landing);
 
-		await landing.phoneField.fill('+15550134');
+		await landing.phoneField.fill('+15551230134');
 		await landing.nameField.fill('Priya');
 		await landing.submitButton.click();
 
 		await expect(page).toHaveURL(/\/chat$/);
+		await expect(page.getByRole('heading', { level: 1, name: 'Chat' })).toBeVisible();
+	});
+
+	test('the hero enforces the same rules as the login page', async ({ page }) => {
+		let loginCalls = 0;
+		await page.route('**/api/auth/login', async (route) => {
+			loginCalls += 1;
+			await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: 'valid.jwt.token', user: USER }) });
+		});
+
+		const landing = new LandingPage(page);
+		await landing.goto();
+		await hydrate(landing);
+
+		// A number with no country code is refused rather than guessed at — the
+		// same rule /login applies, because it is the same hook.
+		await landing.phoneField.fill('5551230134');
+		await landing.nameField.fill('Priya');
+		await landing.submitButton.click();
+
+		await expect(page.getByText('Include the country code, like +1 555 123 4567.')).toBeVisible();
+		await expect(page).toHaveURL(/\/$/);
+		expect(loginCalls).toBe(0);
 	});
 });

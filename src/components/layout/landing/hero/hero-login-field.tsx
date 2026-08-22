@@ -3,12 +3,16 @@
 import Button from '@/components/ui/button';
 import Input from '@/components/ui/input';
 import Label from '@/components/ui/label';
+import { useLoginForm } from '@/hooks/use-login-form';
 import { cn } from '@/lib/utils';
-import { memo, type FormEvent } from 'react';
+import { memo } from 'react';
 
 type HeroLoginFieldProps = {
 	className?: string;
 };
+
+const PHONE_ERROR_ID = 'hero-phone-error';
+const NAME_ERROR_ID = 'hero-name-error';
 
 /**
  * The page's central claim, made falsifiable: the primary call to action *is*
@@ -16,33 +20,24 @@ type HeroLoginFieldProps = {
  * `/chat`. There is no intermediate sign-up page because the API has no concept
  * of one.
  *
- * **Currently a presentational shell.** The markup, labels, autocomplete hints
- * and layout are final; the behaviour is not wired yet.
+ * It runs on `useLoginForm` — the same hook `/login` uses, deliberately reused
+ * rather than reimplemented. That hook owns phone validation, E.164
+ * normalization, the in-flight lock, the rename warning, and the mapping of
+ * server field errors back onto fields. A second copy of any of that would let
+ * the two screens drift, and the moment they drift this page is advertising a
+ * flow the product does not actually have.
  *
- * TODO(blocked-on-03): wire to `useLoginForm` from `@/hooks/use-login-form`
- * (`.claude/plans/03-auth-session`, step 2). The hook must be reused verbatim,
- * not reimplemented — it owns phone validation, E.164 normalization, the
- * in-flight lock, the rename warning, and the mapping of server `fieldErrors`
- * back onto fields. If this form grows its own copy of any of that, the page
- * starts making a promise `/login` does not keep. Wiring it means:
- *   1. `const { values, errors, isSubmitting, onFieldChange, onFieldBlur, onSubmit } = useLoginForm()`
- *   2. replace `handleSubmit` below with the hook's `onSubmit`
- *   3. pass `value` / `onChange` / `onBlur` to both inputs, `invalid={...}` and
- *      `aria-describedby` to each, and `disabled` + `aria-busy` to the button
- *   4. render the hook's server error into the `role='alert'` region marked below
+ * The only thing that differs from `/login` is presentation: errors collect
+ * beneath the bar instead of sitting under each field, because the hero is one
+ * horizontal row and inline messages would reflow it as the user types.
  */
 const HeroLoginField = memo(({ className }: HeroLoginFieldProps) => {
-	// TODO(blocked-on-03): replace with `onSubmit` from `useLoginForm`. Until the
-	// hook exists this only stops the browser's default GET submit, which would
-	// otherwise put the phone number in the address bar.
-	const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-		event.preventDefault();
-	};
+	const { phone, name, errors, formError, isSubmitting, isRenaming, onPhoneChange, onNameChange, onBlur, onSubmit } = useLoginForm();
 
 	return (
 		<div className={cn('w-full', className)}>
 			<form
-				onSubmit={handleSubmit}
+				onSubmit={onSubmit}
 				aria-labelledby='hero-field-legend'
 				className='rounded-panel border-border-subtle bg-surface/80 dark:border-border-subtle-dark dark:bg-surface-dark/70 grid gap-2 border p-2 shadow-lg shadow-black/5 backdrop-blur-md sm:grid-cols-[1fr_1fr_auto] sm:items-center sm:gap-0 dark:shadow-black/40'
 			>
@@ -59,24 +54,57 @@ const HeroLoginField = memo(({ className }: HeroLoginFieldProps) => {
 						inputMode='tel'
 						autoComplete='tel'
 						placeholder='+1 555 123 0134'
+						value={phone}
+						onChange={(event) => onPhoneChange(event.target.value)}
+						onBlur={() => onBlur('phone')}
+						invalid={errors.phone !== null}
+						{...(errors.phone === null ? {} : { 'aria-describedby': PHONE_ERROR_ID })}
 						className='mt-0.5 rounded-none border-0 bg-transparent px-0 font-mono text-sm dark:bg-transparent'
 					/>
 				</div>
 
 				<div className='border-border-subtle dark:border-border-subtle-dark px-3 py-1.5 sm:border-l'>
 					<Label htmlFor='hero-name'>Display name</Label>
-					<Input id='hero-name' name='name' autoComplete='name' placeholder='Priya' className='mt-0.5 rounded-none border-0 bg-transparent px-0 text-sm dark:bg-transparent' />
+					<Input
+						id='hero-name'
+						name='name'
+						autoComplete='name'
+						placeholder='Priya'
+						value={name}
+						onChange={(event) => onNameChange(event.target.value)}
+						onBlur={() => onBlur('name')}
+						invalid={errors.name !== null}
+						{...(errors.name === null ? {} : { 'aria-describedby': NAME_ERROR_ID })}
+						className='mt-0.5 rounded-none border-0 bg-transparent px-0 text-sm dark:bg-transparent'
+					/>
 				</div>
 
-				<Button type='submit' size='lg' className='w-full sm:w-auto'>
-					Go on the air
+				<Button type='submit' size='lg' disabled={isSubmitting} aria-busy={isSubmitting} className='w-full sm:w-auto'>
+					{isSubmitting ? 'Tuning in…' : 'Go on the air'}
 				</Button>
 			</form>
 
-			{/* TODO(blocked-on-03): render `useLoginForm`'s server error here. The
-			    region is mounted empty on purpose so the announcement lands the
-			    moment it fills, rather than when the node first appears. */}
-			<div role='alert' aria-live='polite' className='text-danger mt-3 text-sm empty:hidden' />
+			{/* Mounted empty rather than conditionally rendered, so the announcement
+			    lands when the text arrives instead of when the node does. */}
+			<div role='alert' aria-live='polite' className='mt-3 flex flex-col gap-1 text-sm empty:hidden'>
+				{errors.phone !== null && (
+					<p id={PHONE_ERROR_ID} className='text-danger-ink dark:text-danger-ink-dark'>
+						{errors.phone}
+					</p>
+				)}
+				{errors.name !== null && (
+					<p id={NAME_ERROR_ID} className='text-danger-ink dark:text-danger-ink-dark'>
+						{errors.name}
+					</p>
+				)}
+				{formError !== null && <p className='text-danger-ink dark:text-danger-ink-dark'>{formError}</p>}
+			</div>
+
+			{isRenaming && (
+				<p role='status' className='text-ink-muted dark:text-ink-muted-dark mt-3 text-sm text-pretty'>
+					This updates your name everywhere, including in conversations you are already in.
+				</p>
+			)}
 
 			<p className='text-ink-muted dark:text-ink-muted-dark mt-4 max-w-md text-sm text-pretty'>Your number and a name. That's the whole sign-up — there is no second step, and no email will arrive.</p>
 		</div>
