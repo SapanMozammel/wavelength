@@ -36,6 +36,13 @@ const mockAuthApi = async (page: Page) => {
 		});
 	});
 
+	// `/chat` mounts the conversation directory the moment a session lands, so
+	// the list has to be answered here too — an unmocked spec would reach the
+	// shared upstream server and wait out its cold start.
+	await page.route('**/api/conversations', async (route) => {
+		await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) });
+	});
+
 	await page.route('**/api/auth/me', async (route) => {
 		const authorization = route.request().headers()['authorization'];
 		if (authorization === `Bearer ${VALID_TOKEN}`) {
