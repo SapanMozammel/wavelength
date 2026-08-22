@@ -1,10 +1,16 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { memo, type TextareaHTMLAttributes } from 'react';
+import { memo, type Ref, type TextareaHTMLAttributes } from 'react';
 
 type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
 	invalid?: boolean;
+	/**
+	 * Declared explicitly rather than inherited: `TextareaHTMLAttributes` carries
+	 * no `ref`, so without this the composer's auto-grow callback ref would not
+	 * type-check against the primitive it has to attach to.
+	 */
+	ref?: Ref<HTMLTextAreaElement>;
 };
 
 /**
@@ -12,8 +18,9 @@ type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
  * DOM measurement, and it belongs in the `useAutoGrowTextarea` callback-ref hook
  * that the composer owns, not in a presentational primitive.
  */
-const Textarea = memo(({ invalid = false, className, rows = 1, ...rest }: TextareaProps) => (
+const Textarea = memo(({ invalid = false, className, rows = 1, ref, ...rest }: TextareaProps) => (
 	<textarea
+		ref={ref}
 		rows={rows}
 		aria-invalid={invalid || undefined}
 		className={cn(
