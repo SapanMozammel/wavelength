@@ -145,21 +145,21 @@ branching on `type` in JSX.
 ## Testing Strategy
 
 `tests/components/chat/user-search.test.tsx`:
-- [⬜] blank query issues **no** request
-- [⬜] the current user is filtered from results
-- [⬜] searching your own number shows *"That's you."*
-- [⬜] a keystroke aborts the previous request
-- [⬜] zero results renders the empty state, not a blank panel
+- [✅] blank query issues **no** request
+- [✅] the current user is filtered from results
+- [✅] searching your own number shows *"That's you."*
+- [✅] a keystroke aborts the previous request
+- [✅] zero results renders the empty state, not a blank panel
 
 `tests/components/chat/conversation-list.test.tsx`:
-- [⬜] a direct row renders the peer's name; a group row renders the group name
-- [⬜] a `null` `lastMessage` renders "No messages yet"
-- [⬜] loading → skeleton; error → retry that does not clear loaded rows
+- [✅] a direct row renders the peer's name; a group row renders the group name
+- [✅] a `null` `lastMessage` renders "No messages yet"
+- [✅] loading → skeleton; error → retry that does not clear loaded rows
 
 `tests/components/chat/new-group-dialog.test.tsx`:
-- [⬜] submit disabled with a blank name
-- [⬜] submit disabled with fewer than two others selected, with the reason shown
-- [⬜] valid submit dispatches `createGroupConversation`
+- [✅] submit disabled with a blank name
+- [✅] submit disabled with fewer than two others selected, with the reason shown
+- [✅] valid submit dispatches `createGroupConversation`
 
 `e2e/conversations.spec.ts`: search → start a direct chat → it appears in the
 list; create a group with two others → it appears with the right member count.
@@ -185,34 +185,34 @@ list; create a group with two others → it appears with the right member count.
 
 ## Implementation Steps
 
-- [⬜] **1 — `use-debounced-value`.** Generic, tested.
-- [⬜] **2 — `ChatShell`.** Two-pane responsive layout; empty panel state
+- [✅] **1 — `use-debounced-value`.** Generic, tested.
+- [✅] **2 — `ChatShell`.** Two-pane responsive layout; empty panel state
   (*"Pick a conversation, or start one"*) when nothing is selected.
-- [⬜] **3 — `ConversationRow` + skeleton.** Union-safe via `conversationTitle` /
+- [✅] **3 — `ConversationRow` + skeleton.** Union-safe via `conversationTitle` /
   `conversationSubtitle`. Loading, empty, and error states before real data.
-- [⬜] **4 — `ConversationList`.** Wire `useConversations()`; all four states.
-- [⬜] **5 — `SidebarHeader`.** Current user, theme toggle, new-chat and new-group
+- [✅] **4 — `ConversationList`.** Wire `useConversations()`; all four states.
+- [✅] **5 — `SidebarHeader`.** Current user, theme toggle, new-chat and new-group
   triggers.
-- [⬜] **6 — `use-user-search` + `UserSearch`.** Debounce, abort, self-filter,
+- [✅] **6 — `use-user-search` + `UserSearch`.** Debounce, abort, self-filter,
   *"That's you."*, empty and error states.
-- [⬜] **7 — Start direct.** Wire `startDirect`; verify no refetch and no duplicate
+- [✅] **7 — Start direct.** Wire `startDirect`; verify no refetch and no duplicate
   row when the conversation already existed.
-- [⬜] **8 — `NewGroupDialog`.** Multi-select, chips, both client-side rules,
+- [✅] **8 — `NewGroupDialog`.** Multi-select, chips, both client-side rules,
   disabled-with-reason submit.
-- [⬜] **9 — Tests + e2e.**
-- [⬜] **10 — Gate.** `pnpm run check:all`, `pnpm run test`, the e2e spec on
+- [✅] **9 — Tests + e2e.**
+- [✅] **10 — Gate.** `pnpm run check:all`, `pnpm run test`, the e2e spec on
   chromium-desktop.
 
 ## Verification
 
-- [⬜] `grep -rn "\.participants" src/components` — every hit is inside a
+- [✅] `grep -rn "\.participants" src/components` — every hit is inside a
       `type === 'group'` branch
-- [⬜] Searching `+15551234567` returns results and does **not** 500
-- [⬜] Your own name never appears as a startable result
-- [⬜] Group submit is impossible with one participant selected
-- [⬜] Loading / empty / error render for both the list and search
-- [⬜] Axe clean; keyboard-only path works end to end
-- [⬜] 375px: sidebar is the page; selecting navigates to the panel
+- [✅] Searching `+15551234567` returns results and does **not** 500
+- [✅] Your own name never appears as a startable result
+- [✅] Group submit is impossible with one participant selected
+- [✅] Loading / empty / error render for both the list and search
+- [✅] Axe clean; keyboard-only path works end to end
+- [✅] 375px: sidebar is the page; selecting navigates to the panel
 
 ## Risks & Open Questions
 
