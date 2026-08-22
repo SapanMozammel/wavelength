@@ -117,6 +117,22 @@ const gotoChat = async (page: Page) => {
 	await expect(sidebar(page).getByRole('button', { name: new RegExp(ALAN.name) })).toBeVisible();
 };
 
+/**
+ * Brings the conversation list back into view.
+ *
+ * Below `lg` the sidebar and the panel share one column: the list *is* the
+ * page, and opening a conversation replaces it rather than sitting beside it.
+ * So any assertion about the list has to return to it first, exactly as a user
+ * on a phone would. On desktop both are visible at once and this is a no-op.
+ */
+const showList = async (page: Page) => {
+	const back = page.getByRole('button', { name: 'Back to conversations' });
+	if (await back.isVisible()) {
+		await back.click();
+	}
+	await expect(sidebar(page)).toBeVisible();
+};
+
 test.beforeEach(async ({ page }) => {
 	await mockChatApi(page);
 });
@@ -133,9 +149,11 @@ test.describe('starting a conversation', () => {
 
 		// The field clears, the list comes back, and the new row is there —
 		// reconstituted from the create stub plus the peer, with no refetch.
+		await expect(panel(page).getByText(GRACE.name)).toBeVisible();
+
+		await showList(page);
 		await expect(searchField(page)).toHaveValue('');
 		await expect(sidebar(page).getByRole('button', { name: new RegExp(GRACE.name) })).toBeVisible();
-		await expect(panel(page).getByText(GRACE.name)).toBeVisible();
 	});
 
 	test('a phone number with a leading + searches without crashing the endpoint', async ({ page }) => {
@@ -212,9 +230,11 @@ test.describe('group conversations', () => {
 		await create.click();
 
 		await expect(page.getByRole('dialog')).toHaveCount(0);
-		await expect(sidebar(page).getByRole('button', { name: /Launch crew/ })).toBeVisible();
 		// Three, counting the creator the server adds back.
 		await expect(panel(page).getByText('3 members')).toBeVisible();
+
+		await showList(page);
+		await expect(sidebar(page).getByRole('button', { name: /Launch crew/ })).toBeVisible();
 	});
 
 	test('a chosen member can be taken back off the list before creating', async ({ page }) => {
@@ -273,6 +293,9 @@ test.describe('accessibility', () => {
 		await expect(sidebar(page).getByRole('button', { name: new RegExp(GRACE.name) })).toBeFocused();
 		await page.keyboard.press('Enter');
 
+		await expect(panel(page).getByText(GRACE.name)).toBeVisible();
+
+		await showList(page);
 		await expect(searchField(page)).toHaveValue('');
 		await expect(sidebar(page).getByRole('button', { name: new RegExp(GRACE.name) })).toBeVisible();
 	});

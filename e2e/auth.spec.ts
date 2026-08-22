@@ -114,8 +114,13 @@ const submitButton = (page: Page) => page.getByRole('button', { name: 'Continue'
  */
 const gotoLogin = async (page: Page) => {
 	await page.goto('/login');
-	await phoneField(page).fill('+1555');
-	await expect(phoneField(page)).toHaveValue('+1 555');
+	// Retried as a unit: a single fill can land before React attaches, and then
+	// nothing reformats it — the gate has to be able to try again, not just
+	// wait longer on a value that will never change.
+	await expect(async () => {
+		await phoneField(page).fill('+1555');
+		await expect(phoneField(page)).toHaveValue('+1 555', { timeout: 1_000 });
+	}).toPass({ timeout: 20_000 });
 	await phoneField(page).fill('');
 };
 

@@ -24,6 +24,16 @@ import { expect, test } from './fixtures';
 /** The probe deliberately hits the ORIGIN ROOT, never `/api/health` — which 404s. */
 const HEALTH = '**/health';
 
+/**
+ * Next renders its own `<div role="alert" aria-live="assertive"
+ * id="__next-route-announcer__">` into every page, so a bare
+ * `getByRole('alert')` always resolves to the framework rather than the app —
+ * it is permanently "visible", and it makes any "nothing is announced"
+ * assertion unsatisfiable. Both live-region locators here step past it.
+ */
+const appAlert = (page: Page) => page.locator('[role="alert"]:not(#__next-route-announcer__)');
+const appStatus = (page: Page) => page.locator('[role="status"]:not(#__next-route-announcer__)');
+
 /** Answers `/health` after `delayMs`, the way a sleeping instance does. */
 const mockHealth = async (page: Page, delayMs: number) => {
 	await page.route(HEALTH, async (route) => {
@@ -39,7 +49,7 @@ test.describe('a sleeping server explains itself', () => {
 		await mockHealth(page, 12_000);
 		await page.goto('/login');
 
-		const notice = page.getByRole('status');
+		const notice = appStatus(page);
 
 		// Nothing at all before the 2.5s threshold.
 		await expect(notice).toBeHidden();
@@ -62,7 +72,7 @@ test.describe('a sleeping server explains itself', () => {
 
 		// The full budget is 60s; the spec timeout is 90s, so this is the one
 		// test here that genuinely waits it out rather than faking it.
-		const alert = page.getByRole('alert');
+		const alert = appAlert(page);
 		await expect(alert).toContainText(/isn’t responding/i, { timeout: 70_000 });
 
 		const retry = alert.getByRole('button', { name: /retry/i });
@@ -90,8 +100,8 @@ test.describe('a warm server says nothing', () => {
 		// still nothing: no narration, and no "Server's awake" either, because
 		// no wait was ever announced.
 		await page.waitForTimeout(6_000);
-		await expect(page.getByRole('status')).toBeHidden();
-		await expect(page.getByRole('alert')).toBeHidden();
+		await expect(appStatus(page)).toBeHidden();
+		await expect(appAlert(page)).toBeHidden();
 		await expect(page.getByText(/waking the demo server/i)).toBeHidden();
 		await expect(page.getByText(/awake/i)).toBeHidden();
 	});

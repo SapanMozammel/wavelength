@@ -153,8 +153,13 @@ test.describe('landing page onboarding', () => {
 	 * produces, so it is the gate.
 	 */
 	const hydrate = async (landing: LandingPage) => {
-		await landing.phoneField.fill('+1555');
-		await expect(landing.phoneField).toHaveValue('+1 555');
+		// Retried as a unit: a single fill can land before React attaches, and
+		// then nothing reformats it — the gate has to be able to try again, not
+		// just wait longer on a value that will never change.
+		await expect(async () => {
+			await landing.phoneField.fill('+1555');
+			await expect(landing.phoneField).toHaveValue('+1 555', { timeout: 1_000 });
+		}).toPass({ timeout: 20_000 });
 		await landing.phoneField.fill('');
 	};
 
