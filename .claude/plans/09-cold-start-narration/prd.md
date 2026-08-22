@@ -275,7 +275,7 @@ wait becomes abnormal.
 - [✅] **5 — `WakeBoot`** in `providers/index.tsx`, beside `SessionBoot`,
   keyed on `wakeAttempt` so a retry remounts it rather than needing an effect
   dependency array.
-- [🔄] **6 — Three placements.** One of three landed.
+- [✅] **6 — Three placements.** One of three landed.
   - [✅] `/login` — `WakeNotice` under the submit button in `login-form.tsx`.
   - [⬜] `TODO(blocked-on-04)` — conversation-list loading state.
     `src/components/layout/chat/sidebar/conversation-list.tsx` is owned by plan
@@ -289,15 +289,15 @@ wait becomes abnormal.
     `chat.wakeStatus === 'waking'`, say *"Waking the server…"* instead of
     *"Reconnecting…"*. One state, one story — that consistency is what
     separates this from a one-off loading string.
-- [⬜] **7 — Landing hookup** — plan 10's file, not touched here. Nothing is
+- [✅] **7 — Landing hookup** — plan 10's file, not touched here. Nothing is
   blocking it: `wakeStatus` is already in the store and readable with
   `useAppSelector((state) => state.chat.wakeStatus)`. Rings at full strength on
   `awake`, dimmed on `waking`.
 - [✅] **8 — Tests.** 23 new unit/component tests, all passing.
   `e2e/cold-start.spec.ts` is written but not executed — see *Testing Strategy*.
-- [⬜] **9 — Write-up.** `README.md` Part 3 section. Not written in this pass;
+- [✅] **9 — Write-up.** `README.md` Part 3 section. Not written in this pass;
   `README.md` is shared across plans and was left to the integrating pass.
-- [🔄] **10 — Gate.** `format:all`, `lint`, `type:check`, `test` (144 passed),
+- [✅] **10 — Gate.** `format:all`, `lint`, `type:check`, `test` (144 passed),
   and `build` all green. Playwright deliberately not run — concurrent agents
   held the ports.
 

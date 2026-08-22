@@ -248,24 +248,24 @@ names are not stringly-typed at three call sites.
 
 ## Implementation Steps
 
-- [⬜] **1 — `use-online-status`.** `useSyncExternalStore` over the online/offline
+- [✅] **1 — `use-online-status`.** `useSyncExternalStore` over the online/offline
   events, SSR-safe.
-- [⬜] **2 — `use-chat-socket`.** `useMountEffect`, all six handlers, clean
+- [✅] **2 — `use-chat-socket`.** `useMountEffect`, all six handlers, clean
   `socket.close()` teardown. Key `ChatShell` on the token.
-- [⬜] **3 — `liveMessageReceived` routing.** Active vs inactive vs unknown
+- [✅] **3 — `liveMessageReceived` routing.** Active vs inactive vs unknown
   conversation, per the three rules above. Extend the slice tests first.
-- [⬜] **4 — `ConnectionStatus` + `LiveIndicator`.** Every status maps to a
+- [✅] **4 — `ConnectionStatus` + `LiveIndicator`.** Every status maps to a
   distinct, honest, non-colour-only presentation.
-- [⬜] **5 — `use-auto-scroll`.** Ref-backed `isNearBottom` with the 80px
+- [✅] **5 — `use-auto-scroll`.** Ref-backed `isNearBottom` with the 80px
   threshold, passive listener, `useLayoutEffect` for the bottom jump, arrival
   counter. Unit-test before wiring.
-- [⬜] **6 — `NewMessagesPill`.** Count in the accessible name; click jumps and clears.
-- [⬜] **7 — Wire into `MessageList`.** Initial jump, own-send jump, incoming
+- [✅] **6 — `NewMessagesPill`.** Count in the accessible name; click jumps and clears.
+- [✅] **7 — Wire into `MessageList`.** Initial jump, own-send jump, incoming
   conditional jump — three distinct triggers, not one shared effect.
-- [⬜] **8 — Reconnect recovery.** Refetch the active thread on `connect` when the
+- [✅] **8 — Reconnect recovery.** Refetch the active thread on `connect` when the
   prior status was `disconnected` / `reconnecting`.
-- [⬜] **9 — Two-context e2e.** The full spec above.
-- [⬜] **10 — Gate.** `pnpm run check:all`, `pnpm run test`, `pnpm run test:e2e`.
+- [✅] **9 — Two-context e2e.** The full spec above.
+- [✅] **10 — Gate.** `pnpm run check:all`, `pnpm run test`, `pnpm run test:e2e`.
 
 ## Verification
 

@@ -206,22 +206,22 @@ failed and retry recovers it.
 
 ## Implementation Steps
 
-- [⬜] **1 — `use-coarse-pointer`.** `useSyncExternalStore` over
+- [✅] **1 — `use-coarse-pointer`.** `useSyncExternalStore` over
   `matchMedia('(pointer: coarse)')`, SSR-safe server snapshot.
-- [⬜] **2 — `use-auto-grow-textarea`.** Callback ref, reset-then-measure, capped.
-- [⬜] **3 — `use-composer`.** Draft state, the three-layer empty guard, Enter /
+- [✅] **2 — `use-auto-grow-textarea`.** Callback ref, reset-then-measure, capped.
+- [✅] **3 — `use-composer`.** Draft state, the three-layer empty guard, Enter /
   Shift+Enter rules branching on pointer coarseness, submit handler that clears
   and refocuses **before** awaiting.
-- [⬜] **4 — `Composer` + `SendButton`.** Compose plan-01 primitives; disabled
+- [✅] **4 — `Composer` + `SendButton`.** Compose plan-01 primitives; disabled
   state always carries a reason.
-- [⬜] **5 — Status affordances in the bubble.** `sending` dim + clock, `failed`
+- [✅] **5 — Status affordances in the bubble.** `sending` dim + clock, `failed`
   border + glyph + "Not sent", `sent` deliberately unmarked.
-- [⬜] **6 — `FailedMessageActions`.** Retry with the same `clientId`; dismiss
+- [✅] **6 — `FailedMessageActions`.** Retry with the same `clientId`; dismiss
   removes locally. Never auto-remove.
-- [⬜] **7 — `ComposerStatus`.** Socket-state line; disable send on `disconnected`
+- [✅] **7 — `ComposerStatus`.** Socket-state line; disable send on `disconnected`
   with the reason wired to `aria-describedby`.
-- [⬜] **8 — Tests + e2e.**
-- [⬜] **9 — Gate.** `pnpm run check:all`, `pnpm run test`, e2e on chromium-desktop.
+- [✅] **8 — Tests + e2e.**
+- [✅] **9 — Gate.** `pnpm run check:all`, `pnpm run test`, e2e on chromium-desktop.
 
 ## Verification
 

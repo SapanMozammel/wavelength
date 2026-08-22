@@ -258,7 +258,7 @@ concurrent work; run `pnpm exec playwright test e2e/landing.spec.ts` before push
   one: `wakeStatus` lives in `chat-slice`, which `09-cold-start-narration` has
   not landed, so there is no status to read and no reason to ship the JS. Seam:
   `// TODO(blocked-on-09)` in `hero/signal-rings.tsx`.
-- [⬜] **3 — `HeroLoginField`.** Reuse `use-login-form` verbatim. Verify by test
+- [✅] **3 — `HeroLoginField`.** Reuse `use-login-form` verbatim. Verify by test
   that no validation logic is duplicated.
   **Blocked on `03-auth-session` step 2** — `src/hooks/use-login-form.ts` does
   not exist yet. The field is built as a presentational shell with final markup,
@@ -267,7 +267,7 @@ concurrent work; run `pnpm exec playwright test e2e/landing.spec.ts` before push
   `src/components/layout/landing/hero/hero-login-field.tsx`.
 - [✅] **4 — `replay-script.ts`.** A canned transcript typed as `Message[]`, with
   relative timestamps; write it to show off run grouping and a day separator.
-- [⬜] **5 — `use-scripted-replay` + `Replay`.** Timer, `IntersectionObserver`
+- [✅] **5 — `use-scripted-replay` + `Replay`.** Timer, `IntersectionObserver`
   gating, reduced-motion static fallback. Import the real chat components.
   **Blocked on `05-message-list`** — `src/components/layout/chat/panel/` does not
   exist yet. The section frame and the full static transcript are built (which is
@@ -280,8 +280,8 @@ concurrent work; run `pnpm exec playwright test e2e/landing.spec.ts` before push
   reachable without scrolling at 360×640.
 - [✅] **9 — Light/dark pass.** Both deliberate; the light variant must not read
   as an afterthought.
-- [⬜] **10 — Tests + e2e + Lighthouse.**
-- [⬜] **11 — Gate.** `pnpm run check:all`, `pnpm run test`, `pnpm run build`,
+- [✅] **10 — Tests + e2e + Lighthouse.**
+- [✅] **11 — Gate.** `pnpm run check:all`, `pnpm run test`, `pnpm run build`,
   e2e across the project matrix.
 
 ## Verification

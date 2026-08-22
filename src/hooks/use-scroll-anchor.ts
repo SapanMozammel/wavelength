@@ -30,10 +30,10 @@ export type ScrollAnchor = {
  * `useLayoutEffect`, not `useEffect`: the correction has to land in the same
  * frame as the DOM mutation, or the jump is painted before it is undone.
  *
- * TODO(blocked-on-07): auto-scroll on a live arrival — and the "stay put if the
- * reader has scrolled up" rule that goes with it — is `use-auto-scroll` in plan
- * 07. This hook deliberately handles only content appearing *above* the
- * viewport, so the two can coexist without fighting over `scrollTop`.
+ * Auto-scroll on a live arrival — and the "stay put if the reader has scrolled
+ * up" rule that goes with it — lives in `use-auto-scroll`. This hook deliberately
+ * handles only content appearing *above* the viewport, so the two never fight
+ * over `scrollTop`.
  */
 export const useScrollAnchor = (topRowKey: string | null, rowCount: number): ScrollAnchor => {
 	const scrollRef = useRef<HTMLDivElement | null>(null);

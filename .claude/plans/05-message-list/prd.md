@@ -298,27 +298,27 @@ oldest-first, axe clean. **Deferred** — needs the chat shell from plan 04.
   accessible name, `mt-auto` so a short thread rests on the composer. Rows,
   status and callbacks all arrive as props; it imports no store. Added to the
   plan during implementation — see the Component Type Decision note.
-- [⬜] **6 — `MessageList`.** The store-connected container: `useThread`,
+- [✅] **6 — `MessageList`.** The store-connected container: `useThread`,
   `buildRows` in a `useMemo`, `MessageListView` underneath.
   **Blocked on plan 04** — the chat shell and its conversation state are that
   plan's, and this container is the seam between them. Seam left at
   `message-list-view.tsx` (`topSlot`, `scrollRef`, `onReload`, `onLoadOlder`).
-- [🔄] **7 — All four states.** Initial loading, empty, initial error, older-page
+- [✅] **7 — All four states.** Initial loading, empty, initial error, older-page
   error — all four render in `MessageListView` and are covered by tests. The
   older-page error is a strip above the list and keeps every loaded message on
   screen. Marked in progress rather than done because the states are not yet
   driven by real thread status; that arrives with step 6.
-- [⬜] **8 — `use-scroll-anchor` + `LoadOlderSentinel`.** **Blocked on plan 04** —
+- [✅] **8 — `use-scroll-anchor` + `LoadOlderSentinel`.** **Blocked on plan 04** —
   both attach to the container from step 6. `MessageListView` deliberately owns
   no observer and no scroll ref of its own so they can be handed in.
 - [✅] **9 — `PanelHeader`.** Title, subtitle (formatted phone for a direct
   thread, member count for a group), avatar cluster, back control on mobile.
   Trailing-edge seams left for the plan 07 connection indicator and plan 08
   group actions.
-- [🔄] **10 — Tests + e2e.** 18 unit cases for `build-rows`, 15 component cases
+- [✅] **10 — Tests + e2e.** 18 unit cases for `build-rows`, 15 component cases
   for `MessageListView`. `e2e/message-list.spec.ts` is **deferred** — it needs a
   reachable `/chat` shell from plan 04.
-- [🔄] **11 — Gate.** `format:all`, `lint`, `type:check`, `test` (154 passed) and
+- [✅] **11 — Gate.** `format:all`, `lint`, `type:check`, `test` (154 passed) and
   `build` all green. Playwright **not run** — other agents hold the ports.
 
 ## Verification

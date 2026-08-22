@@ -57,17 +57,17 @@ export type MessageListViewProps = {
 	/**
 	 * Rendered above the first row.
 	 *
-	 * TODO(blocked-on-04): the `LoadOlderSentinel` (step 8) mounts here. It is a
-	 * slot rather than a built-in so this component owns no `IntersectionObserver`
-	 * and stays renderable from a Server Component.
+	 * The `LoadOlderSentinel` mounts here. It is a slot rather than a built-in so
+	 * this component owns no `IntersectionObserver` and stays renderable from a
+	 * Server Component — which is what lets the landing page reuse it.
 	 */
 	topSlot?: ReactNode;
 	/**
 	 * The scroll container itself.
 	 *
-	 * TODO(blocked-on-04): `use-scroll-anchor` (step 8) attaches here to measure
-	 * `scrollHeight` before and after an older page is prepended. Scroll position
-	 * is deliberately not state — it lives in refs, outside React's render path.
+	 * `use-scroll-anchor` attaches here to measure `scrollHeight` before and after
+	 * an older page is prepended. Scroll position is deliberately not state — it
+	 * lives in refs, outside React's render path.
 	 */
 	scrollRef?: Ref<HTMLDivElement>;
 	className?: string;
