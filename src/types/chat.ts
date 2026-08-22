@@ -37,6 +37,17 @@ export type Message = {
 	clientId?: string;
 };
 
+/**
+ * Where a message sits inside a run of consecutive messages from one sender.
+ *
+ * Drives bubble corner geometry and the placement of the sender name and the
+ * visible timestamp, so it is a domain-shaped enum rather than a pair of
+ * booleans: `first`/`last` are not independent, and a type that can express
+ * "starts a run and also ends it" as anything other than `single` invites the
+ * bug where a lone message renders with two squared-off seams and no tail.
+ */
+export type MessageRunPosition = 'single' | 'first' | 'middle' | 'last';
+
 export type ConversationBase = {
 	id: string;
 	lastMessage: Message | null;
@@ -72,6 +83,17 @@ export const conversationTitle = (conversation: Conversation): string => (conver
 
 /** Stable subtitle: phone for a direct chat, member count for a group. */
 export const conversationSubtitle = (conversation: Conversation): string => (conversation.type === 'group' ? `${conversation.participants.length} members` : conversation.participant.phone);
+
+/**
+ * Everyone who can appear as a sender, for either conversation kind.
+ *
+ * Deliberately does **not** include the session user: a direct conversation's
+ * `participant` is only the other person, and the API never returns the caller
+ * in a participant list. Callers that need the full sender universe — message
+ * row building, for one — append the session user themselves, which keeps the
+ * "who am I" question in exactly one place instead of two.
+ */
+export const conversationParticipants = (conversation: Conversation): readonly User[] => (conversation.type === 'group' ? conversation.participants : [conversation.participant]);
 
 /**
  * Lifecycle of anything fetched from the API. `ready` rather than `success`
