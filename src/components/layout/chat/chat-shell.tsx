@@ -1,10 +1,12 @@
 'use client';
 
+import ConnectionStatus from '@/components/layout/chat/connection-status';
 import ChatPanel from '@/components/layout/chat/panel';
 import Sidebar from '@/components/layout/chat/sidebar';
 import Avatar from '@/components/ui/avatar';
 import EmptyState from '@/components/ui/empty-state';
 import IconButton from '@/components/ui/icon-button';
+import { useChatSocket } from '@/hooks/use-chat-socket';
 import { cn } from '@/lib/utils';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectActiveConversation } from '@/store/slices/chat-selectors';
@@ -31,6 +33,7 @@ const ChatShell = memo(() => {
 	const dispatch = useAppDispatch();
 	const conversation = useAppSelector(selectActiveConversation);
 	const currentUserId = useAppSelector((state) => state.session.user?.id ?? null);
+	const token = useAppSelector((state) => state.session.token);
 
 	const handleBack = useCallback(() => {
 		dispatch(conversationClosed());
@@ -40,6 +43,10 @@ const ChatShell = memo(() => {
 
 	return (
 		<div className='flex size-full overflow-hidden'>
+			{/* Keyed on the token: a new session builds a clean connection rather than
+			    re-authenticating one in place. */}
+			{token !== null && <SocketConnection key={token} token={token} />}
+
 			{/* The page's heading. Visually silent because the sidebar's own
 			    branding already names the screen, but a page with no `h1` leaves
 			    a screen-reader user with nothing to orient on. */}
@@ -57,6 +64,7 @@ const ChatShell = memo(() => {
 					/>
 				) : (
 					<>
+						<ConnectionStatus />
 						<header className='border-border-subtle dark:border-border-subtle-dark bg-surface dark:bg-surface-dark flex shrink-0 items-center gap-3 border-b px-3 py-2.5'>
 							<IconButton label='Back to conversations' icon={<IconArrowLeft aria-hidden='true' className='size-5' />} onClick={handleBack} className='lg:hidden' />
 							<Avatar name={conversationTitle(conversation)} seed={conversation.type === 'group' ? conversation.id : conversation.participant.id} size='sm' />
@@ -77,6 +85,20 @@ const ChatShell = memo(() => {
 		</div>
 	);
 });
+
+/**
+ * Holds the socket open for as long as the session does.
+ *
+ * A component rather than a bare hook call so it can be keyed on the token:
+ * a new token remounts this and builds a clean connection, instead of trying to
+ * re-authenticate one in place. Renders nothing — the connection is the point.
+ */
+const SocketConnection = memo(({ token }: { token: string }) => {
+	useChatSocket(token);
+	return null;
+});
+
+SocketConnection.displayName = 'SocketConnection';
 
 ChatShell.displayName = 'ChatShell';
 

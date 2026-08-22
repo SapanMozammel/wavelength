@@ -2,9 +2,12 @@
 
 import LoadOlderSentinel from '@/components/layout/chat/panel/load-older-sentinel';
 import MessageListView from '@/components/layout/chat/panel/message-list-view';
+import NewMessagesPill from '@/components/layout/chat/panel/new-messages-pill';
+import { useAutoScroll } from '@/hooks/use-auto-scroll';
 import { useScrollAnchor } from '@/hooks/use-scroll-anchor';
 import { useThread } from '@/hooks/use-thread';
 import { buildRows } from '@/lib/chat/build-rows';
+import { cn } from '@/lib/utils';
 import { conversationParticipants, conversationTitle, type Conversation } from '@/types/chat';
 import { memo, useMemo } from 'react';
 
@@ -47,24 +50,35 @@ const MessageList = memo(({ conversation, currentUserId, className }: MessageLis
 	const topRowKey = rows.at(0)?.key ?? null;
 	const { scrollRef } = useScrollAnchor(topRowKey, rows.length);
 
+	const latest = messages.at(-1) ?? null;
+	const { onScroll, missedCount, jumpToLatest } = useAutoScroll({
+		scrollRef,
+		rowCount: rows.length,
+		latestId: latest?.id ?? null,
+		latestIsOwn: latest?.senderId === currentUserId,
+	});
+
 	const peerName = conversation.type === 'direct' ? conversation.participant.name : conversationTitle(conversation);
 
 	return (
-		<MessageListView
-			rows={rows}
-			conversationName={conversationTitle(conversation)}
-			peerName={peerName}
-			status={status}
-			olderStatus={olderStatus}
-			hasMore={hasMore}
-			error={error}
-			now={now}
-			onReload={reload}
-			onLoadOlder={loadOlder}
-			scrollRef={scrollRef}
-			topSlot={<LoadOlderSentinel hasMore={hasMore} isLoading={olderStatus === 'loading'} onLoadOlder={loadOlder} />}
-			{...(className === undefined ? {} : { className })}
-		/>
+		<div className={cn('relative flex min-h-0 flex-1 flex-col', className)}>
+			<MessageListView
+				rows={rows}
+				conversationName={conversationTitle(conversation)}
+				peerName={peerName}
+				status={status}
+				olderStatus={olderStatus}
+				hasMore={hasMore}
+				error={error}
+				now={now}
+				onReload={reload}
+				onLoadOlder={loadOlder}
+				scrollRef={scrollRef}
+				onScroll={onScroll}
+				topSlot={<LoadOlderSentinel hasMore={hasMore} isLoading={olderStatus === 'loading'} onLoadOlder={loadOlder} />}
+			/>
+			<NewMessagesPill count={missedCount} onJump={jumpToLatest} />
+		</div>
 	);
 });
 

@@ -149,7 +149,7 @@ test.describe('starting a conversation', () => {
 
 		// The field clears, the list comes back, and the new row is there —
 		// reconstituted from the create stub plus the peer, with no refetch.
-		await expect(panel(page).getByText(GRACE.name)).toBeVisible();
+		await expect(panel(page).getByText(GRACE.name, { exact: true })).toBeVisible();
 
 		await showList(page);
 		await expect(searchField(page)).toHaveValue('');
@@ -293,7 +293,7 @@ test.describe('accessibility', () => {
 		await expect(sidebar(page).getByRole('button', { name: new RegExp(GRACE.name) })).toBeFocused();
 		await page.keyboard.press('Enter');
 
-		await expect(panel(page).getByText(GRACE.name)).toBeVisible();
+		await expect(panel(page).getByText(GRACE.name, { exact: true })).toBeVisible();
 
 		await showList(page);
 		await expect(searchField(page)).toHaveValue('');

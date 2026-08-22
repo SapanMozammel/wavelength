@@ -43,6 +43,13 @@ export type MessageListViewProps = {
 	 * makes "Today" a moving target and, on a prerendered page, a mismatch.
 	 */
 	now: number;
+	/**
+	 * Scroll handler for the container. Passed in rather than owned here so the
+	 * "is the reader near the bottom" measurement stays in `use-auto-scroll`,
+	 * outside React's render path — a value that changes on every scroll frame
+	 * must not become state in a component that renders the whole history.
+	 */
+	onScroll?: () => void;
 	/** Retry for the initial-load failure. */
 	onReload?: () => void;
 	/** Retry for a failed older page. */
@@ -78,12 +85,13 @@ export type MessageListViewProps = {
  * assertive**. Assertive interrupts a screen-reader user mid-sentence, which in
  * a chat means every arriving message talks over the message being read.
  */
-const MessageListView = memo(({ rows, conversationName, peerName, status, olderStatus, hasMore, error, now, onReload, onLoadOlder, topSlot, scrollRef, className }: MessageListViewProps) => {
+const MessageListView = memo(({ rows, conversationName, peerName, status, olderStatus, hasMore, error, now, onReload, onLoadOlder, onScroll, topSlot, scrollRef, className }: MessageListViewProps) => {
 	const hasRows = rows.length > 0;
 
 	return (
 		<div
 			ref={scrollRef}
+			onScroll={onScroll}
 			role='log'
 			aria-live='polite'
 			aria-relevant='additions'
