@@ -15,6 +15,13 @@ export const contentType = 'image/png';
  * same reason.
  */
 const TOKEN = {
+	/**
+	 * Literal hex, deliberately. Satori renders this image outside the browser —
+	 * it resolves neither CSS custom properties nor Tailwind classes, so the
+	 * `@theme` tokens cannot reach it. These are the exact sRGB values of those
+	 * tokens; if a token moves, these have to move with it or the social card
+	 * stops matching the product.
+	 */
 	canvas: '#0f0f15',
 	surface: '#17171f',
 	border: '#2f2f39',
@@ -22,7 +29,7 @@ const TOKEN = {
 	inkMuted: '#a0a1a9',
 	signal: '#7f67ff',
 	signalSoft: '#958aff',
-	pulse: '#00e0e0',
+	pulse: '#00c8ca',
 };
 
 /** The still rings from the hero, at OG scale. */

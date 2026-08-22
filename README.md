@@ -299,12 +299,6 @@ project I start.
 
 ### With more time
 
-- **Group administration.** Creating groups works, which is what the brief asks
-  for. Adding, removing, promoting and leaving are not built — the API supports
-  all four, and the plan for them is written
-  ([`08-group-management`](.claude/plans/08-group-management/prd.md)); it was cut
-  under time pressure rather than overlooked. The consequence worth naming: a
-  member who joins a group currently cannot leave it.
 - **Virtualized message list.** Fine at demo scale; a 10,000-message
   conversation would not be. Deliberately avoided for now because a virtualizer
   owns scroll position, and the load-older path already does
@@ -349,9 +343,8 @@ agents, slash commands, skills, and PRDs.
 
 The work was planned as eleven PRDs before any feature code was written, each
 sized to a single `/implement` run, with a dependency graph and an explicit cut
-line in [`.claude/plans/README.md`](.claude/plans/README.md). Nine shipped.
-[`08-group-management`](.claude/plans/08-group-management/prd.md) was cut
-deliberately — it is the one plan the brief does not require.
+line in [`.claude/plans/README.md`](.claude/plans/README.md). All eleven shipped.
+[`08-group-management`](.claude/plans/08-group-management/prd.md) was built last, after the parts the brief actually requires.
 
 Progress lives in the PRDs themselves (`[⬜]` / `[🔄]` / `[✅]`), so the record of
 what was built, deferred, and why is in the repo rather than in a chat log.

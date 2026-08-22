@@ -3,7 +3,7 @@
 Add members, remove, leave, promote to admin, and rename — all admin-gated except
 leaving.
 
-> **This is the first plan on the cut line.** Group *creation* is a stated brief
+> **Built.** Deferred through the deadline, then completed. Group *creation* is a stated brief
 > requirement and ships in [`04-conversation-directory`](../04-conversation-directory/prd.md).
 > Group *administration* is not required by the brief. If the deadline squeezes,
 > cut this before touching plans 05–07.
@@ -173,19 +173,19 @@ search reuses `use-user-search` from plan 04 rather than a second implementation
 
 ## Implementation Steps
 
-- [⬜] **1 — Thunks + `conversationReplaced`.** Four mutations, one reducer.
-- [⬜] **2 — `isGroupAdmin`** in `src/types/chat.ts`, union-safe.
-- [⬜] **3 — `GroupDetailsSheet` shell.** Title, participant count, created-by,
+- [✅] **1 — Thunks + `conversationReplaced`.** Four mutations, one reducer.
+- [✅] **2 — `isGroupAdmin`** in `src/types/chat.ts`, union-safe.
+- [✅] **3 — `GroupDetailsSheet` shell.** Title, participant count, created-by,
   with `isAdmin` computed once at the top.
-- [⬜] **4 — `ParticipantList` + `ParticipantRow` + `AdminBadge`.** Per-person
+- [✅] **4 — `ParticipantList` + `ParticipantRow` + `AdminBadge`.** Per-person
   accessible action names.
-- [⬜] **5 — `AddMembersDialog`.** Reuse `use-user-search`; exclude existing
+- [✅] **5 — `AddMembersDialog`.** Reuse `use-user-search`; exclude existing
   members and the current user from results.
-- [⬜] **6 — `RenameGroupField`.** Inline edit, blank blocked, Escape cancels.
-- [⬜] **7 — Promote + remove.** Admin-gated, confirm on remove.
-- [⬜] **8 — `LeaveGroupDialog`** with the only-admin warning path.
-- [⬜] **9 — Tests + e2e.**
-- [⬜] **10 — Gate.** `pnpm run check:all`, `pnpm run test`, e2e on chromium-desktop.
+- [✅] **6 — `RenameGroupField`.** Inline edit, blank blocked, Escape cancels.
+- [✅] **7 — Promote + remove.** Admin-gated, confirm on remove.
+- [✅] **8 — `LeaveGroupDialog`** with the only-admin warning path.
+- [✅] **9 — Tests + e2e.**
+- [✅] **10 — Gate.** `pnpm run check:all`, `pnpm run test`, e2e on chromium-desktop.
 
 ## Verification
 
