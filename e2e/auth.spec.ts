@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from './fixtures';
+import type { Page } from '@playwright/test';
 
 /**
  * Auth and session, end to end.
@@ -92,13 +93,32 @@ const phoneField = (page: Page) => page.getByLabel('Phone number');
 const nameField = (page: Page) => page.getByLabel('Display name');
 const submitButton = (page: Page) => page.getByRole('button', { name: 'Continue' });
 
+/**
+ * Opens `/login` and waits until the form is actually interactive.
+ *
+ * The form is a client island, and Playwright's auto-waiting covers the DOM,
+ * not hydration. Clicking submit before React attaches lets the browser submit
+ * the form natively — which navigates away instead of running client-side
+ * validation, and puts the typed phone number in the URL on the way. On WebKit
+ * under a loaded matrix that window is wide enough to lose a test to.
+ *
+ * The gate is a behaviour only the hydrated form produces: as-you-type
+ * grouping. An unhydrated input holds whatever was typed, verbatim.
+ */
+const gotoLogin = async (page: Page) => {
+	await page.goto('/login');
+	await phoneField(page).fill('+1555');
+	await expect(phoneField(page)).toHaveValue('+1 555');
+	await phoneField(page).fill('');
+};
+
 test.beforeEach(async ({ page }) => {
 	await mockAuthApi(page);
 });
 
 test.describe('logging in', () => {
 	test('a phone number and a name are enough to reach the chat', async ({ page }) => {
-		await page.goto('/login');
+		await gotoLogin(page);
 		await expect(page.getByRole('heading', { level: 1, name: 'Tune in' })).toBeVisible();
 
 		await phoneField(page).fill('+15551234567');
@@ -116,7 +136,7 @@ test.describe('logging in', () => {
 			await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: VALID_TOKEN, user: USER }) });
 		});
 
-		await page.goto('/login');
+		await gotoLogin(page);
 		await phoneField(page).fill('5551234567');
 		await nameField(page).fill('Ada Lovelace');
 		await submitButton(page).click();
@@ -127,7 +147,7 @@ test.describe('logging in', () => {
 	});
 
 	test('an empty submit names both missing fields', async ({ page }) => {
-		await page.goto('/login');
+		await gotoLogin(page);
 		await submitButton(page).click();
 
 		await expect(page.getByText('Enter your phone number.')).toBeVisible();
@@ -135,7 +155,7 @@ test.describe('logging in', () => {
 	});
 
 	test('the form is operable from the keyboard alone', async ({ page }) => {
-		await page.goto('/login');
+		await gotoLogin(page);
 
 		await phoneField(page).focus();
 		await page.keyboard.type('+15551234567');
@@ -236,7 +256,7 @@ test.describe('accessibility', () => {
 	}
 
 	test('a field error is wired to its input, not merely coloured red', async ({ page }) => {
-		await page.goto('/login');
+		await gotoLogin(page);
 		await submitButton(page).click();
 
 		await expect(phoneField(page)).toHaveAttribute('aria-invalid', 'true');
