@@ -3,7 +3,7 @@
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { VariantProps } from 'class-variance-authority';
-import { memo, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { memo, type ButtonHTMLAttributes, type ReactNode, type Ref } from 'react';
 
 type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
 	Pick<VariantProps<typeof buttonVariants>, 'variant'> & {
@@ -15,6 +15,8 @@ type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
 		label: string;
 		icon: ReactNode;
 		size?: 'sm' | 'md';
+		/** Declared explicitly: `ButtonHTMLAttributes` carries no `ref`. */
+		ref?: Ref<HTMLButtonElement>;
 	};
 
 /**

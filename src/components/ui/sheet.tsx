@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { IconX } from '@tabler/icons-react';
-import { memo, type ReactNode } from 'react';
+import { memo, type ReactNode, type RefObject } from 'react';
 
 const SIDES = {
 	right: 'inset-y-0 right-0 h-dvh w-[min(24rem,100%)] border-l',
@@ -18,6 +18,15 @@ type SheetProps = {
 	hideTitle?: boolean;
 	/** `right` on wide viewports, `bottom` on narrow — the caller picks. */
 	side?: keyof typeof SIDES;
+	/**
+	 * The control that opened this sheet.
+	 *
+	 * Radix restores focus to its own `Dialog.Trigger`, and this sheet is
+	 * controlled — it renders no trigger — so without an explicit target the
+	 * closing sheet drops focus onto the body and a keyboard user is returned to
+	 * the top of the document. Passing the opener keeps them where they were.
+	 */
+	returnFocusRef?: RefObject<HTMLElement | null>;
 	children: ReactNode;
 	className?: string;
 };
@@ -31,11 +40,18 @@ type SheetProps = {
  * the user navigates to, not an overlay, and modelling it as a sheet traps it
  * behind a dismissal.
  */
-const Sheet = memo(({ open, onOpenChange, title, hideTitle = false, side = 'right', children, className }: SheetProps) => (
+const Sheet = memo(({ open, onOpenChange, title, hideTitle = false, side = 'right', returnFocusRef, children, className }: SheetProps) => (
 	<DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
 		<DialogPrimitive.Portal>
 			<DialogPrimitive.Overlay className='fixed inset-0 z-40 bg-black/50 backdrop-blur-sm' />
 			<DialogPrimitive.Content
+				onCloseAutoFocus={(event) => {
+					const target = returnFocusRef?.current;
+					if (target !== null && target !== undefined) {
+						event.preventDefault();
+						target.focus();
+					}
+				}}
 				className={cn(
 					'bg-surface dark:bg-surface-dark border-border-subtle dark:border-border-subtle-dark fixed z-50 flex flex-col gap-4 p-5 shadow-lg shadow-black/10 dark:shadow-black/40',
 					SIDES[side],

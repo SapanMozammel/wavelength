@@ -93,6 +93,19 @@ export const conversationSubtitle = (conversation: Conversation): string => (con
  * row building, for one — append the session user themselves, which keeps the
  * "who am I" question in exactly one place instead of two.
  */
+/**
+ * Whether a user may administer this conversation.
+ *
+ * Union-safe by construction, so no call site has to check `type` first — a
+ * direct conversation simply has no admins, which is the correct answer rather
+ * than an error.
+ *
+ * Used to *hide* admin controls, not to justify showing an error after one is
+ * pressed. The API's `403` is still handled, because a user can be demoted
+ * while the panel is open, but it is the fallback and not the mechanism.
+ */
+export const isGroupAdmin = (conversation: Conversation, userId: string): boolean => conversation.type === 'group' && conversation.adminIds.includes(userId);
+
 export const conversationParticipants = (conversation: Conversation): readonly User[] => (conversation.type === 'group' ? conversation.participants : [conversation.participant]);
 
 /**

@@ -1,6 +1,7 @@
 'use client';
 
 import ConnectionStatus from '@/components/layout/chat/connection-status';
+import GroupDetailsSheet from '@/components/layout/chat/group/group-details-sheet';
 import ChatPanel from '@/components/layout/chat/panel';
 import Sidebar from '@/components/layout/chat/sidebar';
 import Avatar from '@/components/ui/avatar';
@@ -12,8 +13,8 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectActiveConversation } from '@/store/slices/chat-selectors';
 import { conversationClosed } from '@/store/slices/chat-slice';
 import { conversationSubtitle, conversationTitle } from '@/types/chat';
-import { IconArrowLeft, IconMessages } from '@tabler/icons-react';
-import { memo, useCallback } from 'react';
+import { IconArrowLeft, IconMessages, IconUsers } from '@tabler/icons-react';
+import { memo, useCallback, useRef, useState } from 'react';
 
 /**
  * The two-pane chat screen.
@@ -34,6 +35,8 @@ const ChatShell = memo(() => {
 	const conversation = useAppSelector(selectActiveConversation);
 	const currentUserId = useAppSelector((state) => state.session.user?.id ?? null);
 	const token = useAppSelector((state) => state.session.token);
+	const [groupDetailsOpen, setGroupDetailsOpen] = useState(false);
+	const groupDetailsTriggerRef = useRef<HTMLButtonElement>(null);
 
 	const handleBack = useCallback(() => {
 		dispatch(conversationClosed());
@@ -68,11 +71,21 @@ const ChatShell = memo(() => {
 						<header className='border-border-subtle dark:border-border-subtle-dark bg-surface dark:bg-surface-dark flex shrink-0 items-center gap-3 border-b px-3 py-2.5'>
 							<IconButton label='Back to conversations' icon={<IconArrowLeft aria-hidden='true' className='size-5' />} onClick={handleBack} className='lg:hidden' />
 							<Avatar name={conversationTitle(conversation)} seed={conversation.type === 'group' ? conversation.id : conversation.participant.id} size='sm' />
-							<div className='min-w-0'>
+							<div className='min-w-0 flex-1'>
 								<p className='text-ink dark:text-ink-dark truncate text-sm font-medium'>{conversationTitle(conversation)}</p>
 								<p className='text-ink-muted dark:text-ink-muted-dark truncate text-xs'>{conversationSubtitle(conversation)}</p>
 							</div>
+							{conversation.type === 'group' && (
+								<IconButton
+									ref={groupDetailsTriggerRef}
+									label={`Group details for ${conversation.name}`}
+									onClick={() => setGroupDetailsOpen(true)}
+									icon={<IconUsers aria-hidden='true' className='size-5' />}
+								/>
+							)}
 						</header>
+
+						{conversation.type === 'group' && <GroupDetailsSheet open={groupDetailsOpen} onOpenChange={setGroupDetailsOpen} conversation={conversation} returnFocusRef={groupDetailsTriggerRef} />}
 
 						{/* Keyed on the conversation so switching threads remounts rather
 						    than re-synchronising: history refetches, the scroll anchor

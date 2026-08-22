@@ -1,9 +1,9 @@
-import { createGroup, getMessages, listConversations, sendMessage, startDirectConversation } from '@/lib/api';
+import { addParticipants, createGroup, getMessages, listConversations, promoteToAdmin, removeParticipant, renameGroup, sendMessage, startDirectConversation } from '@/lib/api';
 import { ApiError, userFacingMessage } from '@/lib/api/errors';
 import type { WakeStatus } from '@/lib/api/health';
 import type { SocketStatus } from '@/lib/socket/client';
 import type { AsyncStatus, ChatError, ChatErrorKind, Conversation, Message, MessagePage, User } from '@/types/chat';
-import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSlice, isAnyOf, type PayloadAction } from '@reduxjs/toolkit';
 import { appendHistory, appendOptimistic, confirmOptimistic, dismissOptimistic, emptyThread, failOptimistic, prependPage, receiveLive, type OptimisticMessage, type Thread } from './chat-merge';
 
 /**
@@ -295,6 +295,73 @@ export const createGroupConversation = createAsyncThunk<Conversation, CreateGrou
 	}
 });
 
+type GroupMemberArg = { conversationId: string; userIds: string[] };
+type GroupUserArg = { conversationId: string; userId: string };
+type GroupRenameArg = { conversationId: string; name: string };
+
+/**
+ * Group administration.
+ *
+ * Every one of these endpoints returns the **complete** group object, which is
+ * the API at its most consistent — so the client replaces the conversation
+ * wholesale instead of patching fields. No merge logic, no partial-update
+ * reconciliation, and no way for a local copy to drift from the server's.
+ *
+ * None of them are optimistic. They are fast, and an optimistic removal that
+ * comes back `403` has to put a person back into a list the user is looking at
+ * — which is a worse experience than the round trip it saves.
+ */
+export const addGroupMembers = createAsyncThunk<Conversation, GroupMemberArg, ChatThunkConfig>('chat/addGroupMembers', async ({ conversationId, userIds }, api) => {
+	try {
+		return await addParticipants(conversationId, userIds, requireSession(api.getState()).token);
+	} catch (error) {
+		return api.rejectWithValue(toChatError(error));
+	}
+});
+
+export const removeGroupMember = createAsyncThunk<Conversation, GroupUserArg, ChatThunkConfig>('chat/removeGroupMember', async ({ conversationId, userId }, api) => {
+	try {
+		return await removeParticipant(conversationId, userId, requireSession(api.getState()).token);
+	} catch (error) {
+		return api.rejectWithValue(toChatError(error));
+	}
+});
+
+export const promoteGroupAdmin = createAsyncThunk<Conversation, GroupUserArg, ChatThunkConfig>('chat/promoteGroupAdmin', async ({ conversationId, userId }, api) => {
+	try {
+		return await promoteToAdmin(conversationId, userId, requireSession(api.getState()).token);
+	} catch (error) {
+		return api.rejectWithValue(toChatError(error));
+	}
+});
+
+export const renameGroupConversation = createAsyncThunk<Conversation, GroupRenameArg, ChatThunkConfig>('chat/renameGroupConversation', async ({ conversationId, name }, api) => {
+	try {
+		return await renameGroup(conversationId, name, requireSession(api.getState()).token);
+	} catch (error) {
+		return api.rejectWithValue(toChatError(error));
+	}
+});
+
+/**
+ * Leaving is removing yourself — the same endpoint, and the one case where the
+ * admin gate does not apply.
+ *
+ * It resolves to the conversation **id** rather than the updated group, because
+ * the caller is no longer a member: the response describes a room they cannot
+ * see any more, and subsequent list fetches will not include it. The reducer
+ * drops it rather than storing it.
+ */
+export const leaveGroupConversation = createAsyncThunk<string, string, ChatThunkConfig>('chat/leaveGroupConversation', async (conversationId, api) => {
+	try {
+		const session = requireSession(api.getState());
+		await removeParticipant(conversationId, session.user.id, session.token);
+		return conversationId;
+	} catch (error) {
+		return api.rejectWithValue(toChatError(error));
+	}
+});
+
 const chatSlice = createSlice({
 	name: 'chat',
 	initialState,
@@ -457,6 +524,29 @@ const chatSlice = createSlice({
 			.addCase(createGroupConversation.fulfilled, (state, action) => {
 				upsertConversation(state, action.payload);
 				state.activeConversationId = action.payload.id;
+			})
+
+			.addCase(leaveGroupConversation.fulfilled, (state, action) => {
+				const conversationId = action.payload;
+				delete state.conversations.byId[conversationId];
+				state.conversations.orderedIds = state.conversations.orderedIds.filter((id) => id !== conversationId);
+				delete state.threads[conversationId];
+				delete state.unread[conversationId];
+				if (state.activeConversationId === conversationId) {
+					state.activeConversationId = null;
+				}
+			})
+
+			/**
+			 * Four mutations, one handler. Each returns the full group, so the
+			 * stored copy is replaced wholesale rather than merged — no partial
+			 * update can leave a local copy disagreeing with the server.
+			 *
+			 * `addMatcher` must follow every `addCase`; RTK builds the chain in
+			 * that order and silently loses type inference otherwise.
+			 */
+			.addMatcher(isAnyOf(addGroupMembers.fulfilled, removeGroupMember.fulfilled, promoteGroupAdmin.fulfilled, renameGroupConversation.fulfilled), (state, action: PayloadAction<Conversation>) => {
+				upsertConversation(state, action.payload);
 			});
 	},
 });
