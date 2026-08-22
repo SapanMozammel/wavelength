@@ -1,5 +1,6 @@
 import { createGroup, getMessages, listConversations, sendMessage, startDirectConversation } from '@/lib/api';
 import { ApiError, userFacingMessage } from '@/lib/api/errors';
+import type { WakeStatus } from '@/lib/api/health';
 import type { SocketStatus } from '@/lib/socket/client';
 import type { AsyncStatus, ChatError, ChatErrorKind, Conversation, Message, MessagePage, User } from '@/types/chat';
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
@@ -35,6 +36,26 @@ export type ChatState = {
 	 */
 	unread: Record<string, number>;
 	socketStatus: SocketStatus;
+
+	/**
+	 * Cold-start narration (quirk 20). The API is on a free Render tier that
+	 * sleeps after inactivity, so the first request of a session can take 30 to
+	 * 60 seconds. These four fields are what lets the app say so out loud
+	 * instead of spinning at the user — and, just as importantly, what keeps it
+	 * silent when the server is already warm.
+	 */
+	wakeStatus: WakeStatus;
+	/** When the current probe began, so a surface mounted late still counts from the real start. */
+	wakeStartedAt: number | null;
+	/** Bumped by a retry. `WakeBoot` keys the probe on it, so a change remounts and re-probes. */
+	wakeAttempt: number;
+	/**
+	 * Whether narration was actually shown. This is what gates the closing
+	 * acknowledgement: on a warm server the status goes straight to `awake`,
+	 * nothing was ever said, and "Server's awake" would be an answer to a
+	 * question nobody asked.
+	 */
+	wakeNarrated: boolean;
 };
 
 const initialState: ChatState = {
@@ -43,6 +64,10 @@ const initialState: ChatState = {
 	activeConversationId: null,
 	unread: {},
 	socketStatus: 'disconnected',
+	wakeStatus: 'unknown',
+	wakeStartedAt: null,
+	wakeAttempt: 0,
+	wakeNarrated: false,
 };
 
 /**
@@ -283,6 +308,37 @@ const chatSlice = createSlice({
 			state.socketStatus = action.payload;
 		},
 
+		/** A probe has been fired; the payload is its start time. */
+		wakeProbeStarted: (state, action: PayloadAction<number>) => {
+			state.wakeStartedAt = action.payload;
+		},
+
+		/**
+		 * The only writer of `wakeStatus`.
+		 *
+		 * Reaching `waking` is also what records that something was said, and
+		 * that flag is deliberately *not* cleared on `awake` — the closing
+		 * acknowledgement needs to know the wait happened.
+		 */
+		wakeStatusChanged: (state, action: PayloadAction<WakeStatus>) => {
+			state.wakeStatus = action.payload;
+			if (action.payload === 'waking') {
+				state.wakeNarrated = true;
+			}
+		},
+
+		/** The acknowledgement has had its moment; drop the notice everywhere at once. */
+		wakeAcknowledged: (state) => {
+			state.wakeNarrated = false;
+		},
+
+		wakeRetryRequested: (state) => {
+			state.wakeStatus = 'unknown';
+			state.wakeStartedAt = null;
+			state.wakeNarrated = false;
+			state.wakeAttempt += 1;
+		},
+
 		/**
 		 * A `message:new` push.
 		 *
@@ -390,6 +446,18 @@ const chatSlice = createSlice({
 	},
 });
 
-export const { conversationOpened, conversationClosed, socketStatusChanged, liveMessageReceived, unreadCleared, optimisticAppended, optimisticFailed } = chatSlice.actions;
+export const {
+	conversationOpened,
+	conversationClosed,
+	socketStatusChanged,
+	liveMessageReceived,
+	unreadCleared,
+	optimisticAppended,
+	optimisticFailed,
+	wakeProbeStarted,
+	wakeStatusChanged,
+	wakeAcknowledged,
+	wakeRetryRequested,
+} = chatSlice.actions;
 
 export default chatSlice.reducer;

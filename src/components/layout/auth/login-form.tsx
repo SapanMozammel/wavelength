@@ -1,5 +1,6 @@
 'use client';
 
+import WakeNotice from '@/components/layout/common/wake-notice';
 import Button from '@/components/ui/button';
 import Input from '@/components/ui/input';
 import Label from '@/components/ui/label';
@@ -130,6 +131,12 @@ const LoginForm = memo(() => {
 					'Continue'
 				)}
 			</Button>
+
+			{/* Under the button rather than above it: `/login` is the most likely
+			    first contact with the API, and the login POST is the request most
+			    likely to eat the free tier's 30-60s cold start (quirk 20). On a
+			    warm server this renders nothing at all — see `WakeNotice`. */}
+			<WakeNotice />
 		</form>
 	);
 });
