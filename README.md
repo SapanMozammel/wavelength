@@ -21,14 +21,14 @@ Requires Node 20+ and pnpm 9+.
 ```bash
 pnpm install
 cp .env.example .env.local     # defaults already point at the live API
-pnpm dev                       # http://localhost:8000
+pnpm dev                       # prints the URL it picked (default :3000)
 ```
 
 ### Scripts
 
 | Command | Does |
 |---|---|
-| `pnpm dev` | Dev server on port 8000 |
+| `pnpm dev` | Dev server. Set `PORT` to pin it; otherwise Next picks the first free port from 3000 |
 | `pnpm build` | Production build |
 | `pnpm test` | Vitest unit + component tests |
 | `pnpm test:e2e` | Playwright, 6-project matrix, port 8001 |
@@ -52,6 +52,28 @@ explains why. There are no secrets — the browser talks to the API directly.
 
 > The demo API runs on a free Render tier and sleeps after inactivity. The first
 > request of a session can take 30–60 seconds.
+
+### Deploying
+
+One deployment serves both parts: `/` is the landing page, `/chat` is the app.
+
+```bash
+vercel link
+vercel --prod
+```
+
+Set these in the Vercel project, on **Production and Preview**:
+
+| Variable | Value |
+|---|---|
+| `NEXT_PUBLIC_API_BASE_URL` | `https://frontend-task-chatapp.onrender.com/api` |
+| `NEXT_PUBLIC_SOCKET_URL` | `https://frontend-task-chatapp.onrender.com` |
+| `NEXT_PUBLIC_SITE_URL` | the deployed origin, e.g. `https://wavelength.vercel.app` |
+
+`NEXT_PUBLIC_SITE_URL` is the one worth double-checking: it feeds `metadataBase`,
+so if it is missing or stale every Open Graph tag and the landing page's JSON-LD
+point somewhere that is not the site. There are no secrets — the browser talks to
+the chat API directly.
 
 ---
 
@@ -154,6 +176,43 @@ The invariants are pinned by tests: `normalizeRestMessage` and
 same logical message, so a future API change fails loudly in CI rather than
 silently in the UI.
 
+**One reducer owns message order.** Three sources write to the same ordered
+list — an optimistic send, a socket arrival, and a page of older history — and
+they arrive out of order by nature. All four merge cases live in one pure module
+([`chat-merge.ts`](src/store/slices/chat-merge.ts)) that was written test-first,
+before any component imported it:
+
+- an optimistic message appends under a `clientId`
+- the server response replaces it **in place, by position** — delete-then-append
+  would let two fast sends swap places
+- a socket arrival is a no-op if its id is already present, and otherwise
+  inserts by `createdAt` (binary search, because sockets can deliver out of order)
+- an older page prepends without disturbing the tail
+
+**Auto-scroll is three rules, not one.** The brief asks for one sentence' worth
+of behaviour — follow the conversation, but do not yank a reader who has scrolled
+up — and that is where most implementations fail, because they treat it as a
+single condition. Following an arrival while the reader is at the bottom,
+*always* following their own send (sending is an explicit request to see the
+result), and holding position otherwise are three different answers. "At the
+bottom" is a threshold, never an equality test: a trackpad leaves fractional
+`scrollTop`, so exact comparison classifies a reader who is visibly pinned to the
+bottom as having scrolled away, and silently stops following.
+
+Holding position is only survivable because of the "N new messages" pill —
+without it, a message that arrives while reading history is simply invisible.
+
+**Scroll position and draft text are deliberately not in Redux.** Both change on
+every frame or keystroke, and putting them in the store would re-render the whole
+history to produce a value the DOM already knows.
+
+**Effects are structural, not choreographed.** The panel is mounted as
+`<ChatPanel key={conversationId} />`, so switching threads remounts rather than
+re-synchronising: history refetches on mount, the scroll anchor resets, and there
+is no window in which one thread renders against another's participants. The same
+trick holds the socket — a component keyed on the session token, so a new token
+builds a clean connection instead of re-authenticating one in place.
+
 **A typed error taxonomy** rather than status-code branching. The API's status
 codes are not self-consistent — a missing token is `400`, an invalid one is
 `401`, and a malformed id is a `500` carrying a raw Mongoose `CastError`.
@@ -181,7 +240,7 @@ a driver message to a user.
 
 ### Design (Part 2)
 
-Reasoning is recorded in [`.claude/plans/landing-page/prd.md`](.claude/plans/landing-page/prd.md).
+Reasoning is recorded in [`.claude/plans/10-landing-page/prd.md`](.claude/plans/10-landing-page/prd.md).
 In short: the product's one distinctive idea is identity without an account, so
 the page's primary CTA is the real login field, inline in the hero — a landing
 page that demonstrates "no sign-up flow" rather than claiming it. The palette is
@@ -190,29 +249,68 @@ live, dark-first because that is when messaging apps get used.
 
 ### AI tools
 
-Claude Code (Opus), used for: probing the live API and cataloguing its
-behaviour; scaffolding the project against my existing conventions; drafting the
-API documentation from real probe output; and writing the normalizer, error
-taxonomy, and their tests.
+**Claude Code (Opus)**, used heavily and across the whole project — the brief
+asks for an accurate account, so here is one.
 
-What I directed rather than accepted: the decision to probe the API before
-writing any UI, and the choice to make the normalization boundary the
-architectural centre of the project rather than handling shape differences at
-call sites. The project conventions — kebab-case files, `type` over `interface`,
-arrow functions, tokens-only styling, the `.formatter` single-source setup — come
-from my own `claude-workflow` repo, which is synced into every project I start.
+*What it was used for:* probing the live API and cataloguing its behaviour;
+drafting the API documentation from real probe output; writing the normalizer,
+error taxonomy, state container and their tests; and building most of the UI.
+Later phases ran several agents in parallel, each in its own git worktree with an
+explicit file-ownership boundary, so concurrent work could not clobber shared
+files — `chat-slice.ts` and `types/chat.ts` were each assigned to exactly one
+track at a time.
+
+*What I directed rather than accepted:* probing the API before writing any UI,
+and making the normalization boundary the architectural centre rather than
+handling shape differences at call sites. Splitting the message list into a
+store-free presentational view and a connected container was also a direction —
+it let the landing page reuse the product's real message geometry without pulling
+chat state into its bundle.
+
+*What went wrong, and what that taught me:* agents told not to run Playwright, so
+ports stayed free for parallel work, wrote e2e specs that had therefore never
+executed. Four were wrong on first run — none because the app was broken:
+
+- a bare `getByRole('alert')` matched Next's own `__next-route-announcer__`,
+  present on every page, so "nothing is announced" could never pass
+- a spec seeded state by visiting `/login`, then caught its own setup navigation
+  and read it as a redirect
+- an axe scan landed mid-entrance-animation and reported ~58 contrast failures at
+  a 1.01 ratio, because it was measuring invisible text
+- interactions fired before hydration, so the form submitted natively and skipped
+  client validation entirely
+
+Each time the product was verified correct *before* the test was changed. The
+lesson was a process one — a test that has never been run is not evidence — and
+it surfaced a real convention gap: `workflow/e2e.md` documents a reduced-motion
+fixture that had never been implemented, which is what allowed the axe flake.
+
+*What was checked rather than trusted:* an agent added new colour tokens against
+an explicit instruction not to. It was right — recomputing the contrast showed
+the existing `danger` is 3.87:1 on a light surface, which fails AA for text. The
+socket was likewise verified end-to-end against the live server rather than
+assumed correct, which confirmed `message:new` really does arrive as
+`{ id, createdAt: <epoch> }` while REST returns `_id` and an ISO string.
+
+The project conventions — kebab-case files, `type` over `interface`, arrow
+functions, tokens-only styling, the no-`useEffect` rule, the `.formatter`
+single-source setup — come from my own `claude-workflow` repo, synced into every
+project I start.
 
 ### With more time
 
 - **Virtualized message list.** Fine at demo scale; a 10,000-message
-  conversation would not be.
-- **A mock API layer for tests.** E2E currently depends on the live server,
-  which cold-starts and holds other candidates' data. MSW against the real
-  recorded shapes would make CI deterministic.
+  conversation would not be. Deliberately avoided for now because a virtualizer
+  owns scroll position, and the load-older path already does
+  `scrollHeight`-delta anchoring that it would fight.
+- **A send queue that survives reload.** Failed sends are retryable, but only
+  while the tab is open.
+- **Reconnect backfill is one page deep.** A disconnect longer than one page of
+  traffic can still leave a gap in history.
 - **Read state.** The API has no read endpoint, so unread counts are per-device
   and lost on refresh. Worth proposing upstream rather than faking client-side.
-- **Broader e2e.** The two-context real-time test is the valuable one; group
-  admin flows are currently covered by unit tests only.
+  For the same reason no message shows a delivery checkmark — this API cannot
+  confirm delivery, and drawing a tick would be a lie told in UI.
 
 ### Issues with the API
 
@@ -240,16 +338,16 @@ agents, slash commands, skills, and PRDs.
 ├── agents/      # code-reviewer · test-writer · e2e-spec-author · tailwind-class-reviewer
 ├── commands/    # /plan · /implement · /review · /test · /commit · /pr · …
 ├── skills/      # architecture · design-system · workflow · external references
-└── plans/       # chat-experience/prd.md · landing-page/prd.md
+└── plans/       # 11 sequenced PRDs, one per slice of work
 ```
 
-Both PRDs are written and unstarted. The intended flow:
+The work was planned as eleven PRDs before any feature code was written, each
+sized to a single `/implement` run, with a dependency graph and an explicit cut
+line in [`.claude/plans/README.md`](.claude/plans/README.md). All eleven shipped.
+[`08-group-management`](.claude/plans/08-group-management/prd.md) was built last, after the parts the brief actually requires.
 
-```
-/implement chat-experience     # Part 1, steps 1–10
-/implement landing-page        # Part 2
-/review                        # 6-priority review before PR
-```
+Progress lives in the PRDs themselves (`[⬜]` / `[🔄]` / `[✅]`), so the record of
+what was built, deferred, and why is in the repo rather than in a chat log.
 
 Synced from [`SapanMozammel/claude-workflow`](https://github.com/SapanMozammel/claude-workflow),
 with the GraphQL, i18n, and Tailwind-mangling tooling pruned — none of it

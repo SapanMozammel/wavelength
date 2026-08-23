@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { LandingPage } from './pages/landing-page';
 
 /**
@@ -15,7 +15,11 @@ test.describe('routing', () => {
 
 		await expect(landing.heading).toBeVisible();
 		await landing.openAppLink.click();
-		await expect(page).toHaveURL(/\/chat$/);
+
+		// `/chat` is guarded client-side (there is no server session for
+		// middleware to read), so an unauthenticated visitor is moved to the
+		// login screen rather than shown an empty chat.
+		await expect(page).toHaveURL(/\/login$/);
 	});
 
 	test('login and chat routes resolve', async ({ page }) => {
@@ -23,7 +27,7 @@ test.describe('routing', () => {
 		await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
 		await page.goto('/chat');
-		await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+		await expect(page).toHaveURL(/\/login$/);
 	});
 
 	test('an unknown route renders the 404 page', async ({ page }) => {
@@ -36,6 +40,9 @@ test.describe('accessibility', () => {
 	for (const path of ['/', '/login', '/chat']) {
 		test(`${path} has no detectable axe violations`, async ({ page }) => {
 			await page.goto(path);
+			// `/chat` resolves to the login screen while signed out; either way,
+			// wait for a settled render before scanning.
+			await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 			const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
 			expect(results.violations).toEqual([]);
 		});

@@ -37,6 +37,17 @@ export type Message = {
 	clientId?: string;
 };
 
+/**
+ * Where a message sits inside a run of consecutive messages from one sender.
+ *
+ * Drives bubble corner geometry and the placement of the sender name and the
+ * visible timestamp, so it is a domain-shaped enum rather than a pair of
+ * booleans: `first`/`last` are not independent, and a type that can express
+ * "starts a run and also ends it" as anything other than `single` invites the
+ * bug where a lone message renders with two squared-off seams and no tail.
+ */
+export type MessageRunPosition = 'single' | 'first' | 'middle' | 'last';
+
 export type ConversationBase = {
 	id: string;
 	lastMessage: Message | null;
@@ -72,3 +83,50 @@ export const conversationTitle = (conversation: Conversation): string => (conver
 
 /** Stable subtitle: phone for a direct chat, member count for a group. */
 export const conversationSubtitle = (conversation: Conversation): string => (conversation.type === 'group' ? `${conversation.participants.length} members` : conversation.participant.phone);
+
+/**
+ * Everyone who can appear as a sender, for either conversation kind.
+ *
+ * Deliberately does **not** include the session user: a direct conversation's
+ * `participant` is only the other person, and the API never returns the caller
+ * in a participant list. Callers that need the full sender universe — message
+ * row building, for one — append the session user themselves, which keeps the
+ * "who am I" question in exactly one place instead of two.
+ */
+/**
+ * Whether a user may administer this conversation.
+ *
+ * Union-safe by construction, so no call site has to check `type` first — a
+ * direct conversation simply has no admins, which is the correct answer rather
+ * than an error.
+ *
+ * Used to *hide* admin controls, not to justify showing an error after one is
+ * pressed. The API's `403` is still handled, because a user can be demoted
+ * while the panel is open, but it is the fallback and not the mechanism.
+ */
+export const isGroupAdmin = (conversation: Conversation, userId: string): boolean => conversation.type === 'group' && conversation.adminIds.includes(userId);
+
+export const conversationParticipants = (conversation: Conversation): readonly User[] => (conversation.type === 'group' ? conversation.participants : [conversation.participant]);
+
+/**
+ * Lifecycle of anything fetched from the API. `ready` rather than `success`
+ * because a thread that loaded zero messages is still ready to render.
+ */
+export type AsyncStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+/**
+ * The failure kinds a chat surface can be asked to render.
+ *
+ * This is deliberately a structural mirror of `ApiErrorKind` in
+ * `@/lib/api/errors` rather than a re-export: the domain layer must not import
+ * from the API layer. `toChatError` in `chat-slice.ts` assigns an
+ * `ApiErrorKind` into this type, so if the two ever drift the build breaks
+ * there instead of at runtime here.
+ */
+export type ChatErrorKind = 'network' | 'offline' | 'unauthorized' | 'forbidden' | 'not-found' | 'validation' | 'rate-limited' | 'server' | 'unknown';
+
+/** A rejected chat thunk's payload. Never a raw driver message. */
+export type ChatError = {
+	kind: ChatErrorKind;
+	message: string;
+};

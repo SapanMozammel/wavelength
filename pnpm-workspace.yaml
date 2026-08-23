@@ -1,4 +1,22 @@
+# Native postinstall scripts, answered explicitly.
+#
+# pnpm refuses to guess: leaving a package undecided is a warning locally but a
+# hard error under CI, which is what kept every workflow run failing during
+# install. The scaffold generated this file with literal "set this to true or
+# false" placeholders and they were never answered.
+#
+# All three are declined, and nothing needs them:
+#   @parcel/watcher — native file watching for dev tooling; falls back to
+#                     polling, and CI never watches anything.
+#   sharp           — Next's image optimizer. This app renders no `next/image`;
+#                     its only generated image is the OG card, which goes
+#                     through satori/resvg, not sharp. Vercel supplies sharp in
+#                     its build image anyway if that ever changes.
+#   unrs-resolver   — native resolver for the ESLint import plugin; the WASM
+#                     fallback resolves identically, and lint passes on it.
+#
+# Declining also means no third-party install script executes during a build.
 allowBuilds:
-  '@parcel/watcher': set this to true or false
-  sharp: set this to true or false
-  unrs-resolver: set this to true or false
+  '@parcel/watcher': false
+  sharp: false
+  unrs-resolver: false

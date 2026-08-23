@@ -48,3 +48,17 @@
 		background-position: 200% 0;
 	}
 }
+
+// Landing-page entrance. One orchestrated page load, staggered with the
+// `.animate-rise-*` delay steps in `_utilities.scss`, rather than a scroll
+// library — it costs no JavaScript and keeps the landing page server-rendered.
+@keyframes wl-rise {
+	from {
+		opacity: 0;
+		transform: translateY(1.25rem);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}

@@ -33,7 +33,7 @@ pnpm run format:all    # Organize imports + Prettier + ESLint fix
 # Test & build
 pnpm run test          # Vitest (run once)
 pnpm run build         # Production build
-pnpm run dev           # Dev server on port 8000
+pnpm run dev           # Dev server — Next picks the port ($PORT, else 3000)
 
 # Run before push
 pnpm run test:e2e      # Playwright (6-project matrix, port 8001)
@@ -86,6 +86,15 @@ the normalizer is missing a case — fix it there.
 
 Wire types live in [`src/types/api.ts`](src/types/api.ts); domain types the UI
 consumes live in [`src/types/chat.ts`](src/types/chat.ts). Keep them separate.
+
+**Phone numbers are normalized the same way.** A phone number is this app's
+primary key for identity, and `GET /users/search` substring-matches the stored
+string — so a number saved in one format and searched in another is an account
+nobody can find, with no error from either request. Everything user-typed goes
+through [`src/lib/utils/phone.ts`](src/lib/utils/phone.ts) before it reaches
+the API. That module checks numbers are *possible*, not *valid*: the live
+server already holds accounts on the `+1555…` block that strict validation
+rejects.
 
 ---
 
@@ -184,6 +193,10 @@ same message list, so whatever holds it needs one reducer that owns merge order.
 - No `any` — strict mode with `noUnusedLocals`, `noUnusedParameters`,
   `exactOptionalPropertyTypes`
 - `export default ComponentName` at the bottom of every component file
+- **Never call `useEffect` in a component.** `useMountEffect` from
+  [`src/hooks/use-mount-effect.ts`](src/hooks/use-mount-effect.ts) is the only
+  sanctioned wrapper, and it belongs in a hook — see
+  [`.claude/skills/workflow/no-use-effect.md`](.claude/skills/workflow/no-use-effect.md)
 - PRD history is sacred — never overwrite completed (`[✅]`) steps; use
   `[⬜]` / `[🔄]` / `[✅]`, never `[x]`
 

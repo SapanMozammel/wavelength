@@ -17,9 +17,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No `version:` here on purpose. `pnpm/action-setup` errors outright when
+      # the version is declared both here and as `packageManager` in
+      # package.json, so package.json stays the single source of truth.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - uses: actions/setup-node@v4
         with:
@@ -51,9 +52,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No `version:` here on purpose. `pnpm/action-setup` errors outright when
+      # the version is declared both here and as `packageManager` in
+      # package.json, so package.json stays the single source of truth.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - uses: actions/setup-node@v4
         with:
