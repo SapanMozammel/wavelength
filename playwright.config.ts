@@ -12,6 +12,12 @@ const BASE_URL = `http://localhost:${PORT}`;
 	// run on a server other people are sharing.
 	const LIVE_API_SPEC = /realtime\.spec\.ts/;
 
+	// ...and it is skipped entirely in CI. It registers real accounts on a shared
+	// demo server that cold-starts for up to a minute, so on every push it would
+	// be both a flake source and litter in someone else's data. It stays a local
+	// proof, run deliberately.
+	const CHROMIUM_IGNORES = process.env.CI === undefined ? [] : [LIVE_API_SPEC];
+
 const config = defineConfig({
 	testDir: './e2e',
 	fullyParallel: true,
@@ -38,6 +44,7 @@ const config = defineConfig({
 	projects: [
 		{
 			name: 'chromium-desktop',
+			testIgnore: CHROMIUM_IGNORES,
 			use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 }, locale: 'en-US' },
 		},
 		{
