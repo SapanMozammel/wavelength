@@ -39,8 +39,16 @@ type RootLayoutProps = {
 };
 
 const RootLayout = ({ children }: RootLayoutProps) => (
+	// `suppressHydrationWarning` on both elements, for two different reasons.
+	// On <html>, next-themes' inline script sets `class` and `style` before React
+	// hydrates, so the client tree legitimately differs from the server's. On
+	// <body>, browser extensions do the same thing uninvited — Grammarly injects
+	// `data-gr-ext-installed`, password managers add their own — and React cannot
+	// tell that apart from a real mismatch. Both are scoped to the element's own
+	// attributes and do not reach any child, so a genuine mismatch inside the app
+	// still reports.
 	<html lang='en' suppressHydrationWarning className={`${inter.variable} ${outfit.variable}`}>
-		<body className='min-h-dvh'>
+		<body suppressHydrationWarning className='min-h-dvh'>
 			<Providers>
 				<SkipLink />
 				{children}

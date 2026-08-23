@@ -120,7 +120,7 @@ const UserSearch = memo(({ fallback, className }: UserSearchProps) => {
 
 	return (
 		<div className={cn('flex min-h-0 flex-1 flex-col', className)}>
-			<div className='shrink-0 px-3 pb-3'>
+			<div className='shrink-0 px-3 py-3'>
 				<label htmlFor={SEARCH_INPUT_ID} className='sr-only'>
 					Search people by name or phone number
 				</label>
