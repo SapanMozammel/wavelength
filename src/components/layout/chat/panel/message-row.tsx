@@ -3,7 +3,6 @@
 import MessageBubble from '@/components/layout/chat/panel/message-bubble';
 import Avatar from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { formatMessageTime } from '@/lib/utils/time';
 import type { MessageRunPosition, MessageStatus } from '@/types/chat';
 import { memo } from 'react';
 
@@ -45,7 +44,13 @@ const MessageRow = memo(({ text, createdAt, status, isOwn, senderId, senderName,
 
 	return (
 		<article
-			aria-label={`${speaker}, ${formatMessageTime(createdAt)}: ${text}`}
+			// The time is deliberately absent from this name. The `<time>` element
+			// inside carries it — present on every message, `sr-only` when a run
+			// hides it visually — so repeating it here made a linear-browsing
+			// screen-reader user hear the timestamp twice. It also cannot be
+			// server-rendered safely: the value is locale- and timezone-dependent,
+			// so an attribute built from it disagrees between server and client.
+			aria-label={`${speaker}: ${text}`}
 			className={cn('flex w-full items-end gap-2 first:mt-0', isOwn ? 'justify-end' : 'justify-start', isRunStart(runPosition) ? 'mt-3' : 'mt-0.5')}
 		>
 			{/*

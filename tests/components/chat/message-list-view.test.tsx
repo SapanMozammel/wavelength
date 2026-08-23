@@ -61,7 +61,7 @@ describe('MessageListView — sender distinction', () => {
 		renderView(rowsFor([msg('m1', PEER.id, at(9, 0), 'From Grace'), msg('m2', ME.id, at(9, 1), 'From me')]));
 
 		const received = screen.getByRole('article', { name: new RegExp('Grace Hopper') });
-		const own = screen.getByRole('article', { name: new RegExp('^You,') });
+		const own = screen.getByRole('article', { name: new RegExp('^You:') });
 
 		// Alignment — the row.
 		expect(received.className).toContain('justify-start');
@@ -85,14 +85,32 @@ describe('MessageListView — sender distinction', () => {
 	it('names the session user "You" so a screen reader gets what alignment gives everyone else', () => {
 		renderView(rowsFor([msg('m1', ME.id, at(9, 0), 'mine')]));
 
-		expect(screen.getByRole('article', { name: `You, ${formatMessageTime(at(9, 0))}: mine` })).toBeInTheDocument();
+		expect(screen.getByRole('article', { name: 'You: mine' })).toBeInTheDocument();
+	});
+
+	/**
+	 * The row's name deliberately carries no time. It used to, and that meant a
+	 * screen reader announced the timestamp twice — once from the label, once
+	 * from the `<time>` child. It also could not survive a server render, because
+	 * the value is locale- and timezone-dependent.
+	 *
+	 * So the information has to still be there, just once and in the right place.
+	 */
+	it('keeps the timestamp on a <time> element rather than in the row name', () => {
+		renderView(rowsFor([msg('m1', ME.id, at(9, 0), 'mine')]));
+
+		expect(screen.getByRole('article').getAttribute('aria-label')).not.toContain(formatMessageTime(at(9, 0)));
+
+		const time = screen.getByText(formatMessageTime(at(9, 0)));
+		expect(time.tagName).toBe('TIME');
+		expect(time).toHaveAttribute('dateTime', new Date(at(9, 0)).toISOString());
 	});
 
 	it('names a departed sender rather than leaking a raw id', () => {
 		renderView(rowsFor([msg('m1', 'u-vanished', at(9, 0), 'still here')]));
 
 		const row = screen.getByRole('article');
-		expect(row).toHaveAccessibleName(`Former member, ${formatMessageTime(at(9, 0))}: still here`);
+		expect(row).toHaveAccessibleName('Former member: still here');
 		expect(row.textContent).not.toContain('u-vanished');
 	});
 });

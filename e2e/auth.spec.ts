@@ -117,7 +117,13 @@ const gotoLogin = async (page: Page) => {
 	// Retried as a unit: a single fill can land before React attaches, and then
 	// nothing reformats it — the gate has to be able to try again, not just
 	// wait longer on a value that will never change.
+	// Cleared before each attempt, which is the whole point of the retry.
+	// `fill` on an unhydrated field leaves the raw text behind; refilling the
+	// same string then produces no change event once React does attach, so
+	// the value never reformats and the gate waits forever. Only the slower
+	// WebKit builds get there.
 	await expect(async () => {
+		await phoneField(page).fill('');
 		await phoneField(page).fill('+1555');
 		await expect(phoneField(page)).toHaveValue('+1 555', { timeout: 1_000 });
 	}).toPass({ timeout: 20_000 });

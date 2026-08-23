@@ -89,7 +89,16 @@ const MessageBubble = memo(({ text, createdAt, isOwn, runPosition, showTimestamp
 					status === 'failed' && 'text-danger-ink dark:text-danger-ink-dark'
 				)}
 			>
-				<time dateTime={toIsoString(createdAt)} title={formatFullTimestamp(createdAt)}>
+				{/*
+				 * `suppressHydrationWarning` is correct here rather than a patch.
+				 * Both the text and the `title` are formatted in the reader's own
+				 * locale and timezone, so the server — which has neither — cannot
+				 * produce the same string, and should not: a chat that shows times
+				 * in the server's timezone is wrong for everyone reading it. The
+				 * client value is the right one, and React is told to let it win.
+				 * `dateTime` stays machine-readable UTC and matches on both sides.
+				 */}
+				<time dateTime={toIsoString(createdAt)} title={formatFullTimestamp(createdAt)} suppressHydrationWarning>
 					{formatMessageTime(createdAt)}
 				</time>
 				{statusLabel !== null && <span>· {statusLabel}</span>}
